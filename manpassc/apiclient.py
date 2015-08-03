@@ -147,6 +147,23 @@ class APIClient:
                 wx.PostEvent(win,eevt)
                 return []
 
+    def getAllMetaId(self):
+        self.conn.request("GET",self.urlpath+"/meta-id")
+        print self.urlpath+"/meta-id"
+        resp=self.conn.getresponse()
+        if resp.status !=200:
+            resp.read()
+            if resp.status==204:
+                return []
+            else:
+                raise APITransactionError(self.conn,"Failed to get record")
+        else:
+            raw_body=resp.read()
+            print raw_body
+            rlist=json.loads(raw_body)
+            return rlist
+
+
 
 
     def getAllLatest(self,win=None):
@@ -238,7 +255,7 @@ class APIClient:
         ds=enc.decode(cipherR['Pass'])
         skey=passcrypto.GenerateEncKey(self.masterpass,ds[:passcrypto.SaltSize])
         for k,v in cipherR.items():
-            if k=='Uname' or k=='Pass' or k=='Meta':
+            if k=='Uname'  or k=='Meta':
                 ds=enc.decode(v)
                 cipherR[k]=passcrypto.DecryptWithoutSalt(ds[passcrypto.SaltSize:],skey)
 
@@ -250,19 +267,21 @@ class APIClient:
 
 
 def main():
-    upass="zifan123"
+    upass="zifan234"
     uname="hujun"
-    cadata=loadCAFile(uname,upass)
-    ac=APIClient("127.0.0.1",9000,cadata,
+    cadata=loadCAFile(uname,upass,common.getConfDir(uname))
+    ac=APIClient("127.0.0.1",8030,cadata,
         os.path.join(common.getConfDir(uname),"ee.cert"),
         os.path.join(common.getConfDir(uname),"ee.key"),upass)
-    ac.add(u"谷歌","zifan","alu123")
-    ac.add(u"谷歌","zifan","alu456")
-    ac.add(u"yahoo","dongtian","alu456")
-    #ac.get(u"谷歌")
-    ac.remove(u"yahoo",2)
-    print ac.getAllLatest()
-    #ac.getAllRecodsForMeta(u"谷歌1")
- #   print genRecord(u"谷歌","zifan","alu123")
+##    ac.add(u"谷歌","zifan","alu123")
+##    ac.add(u"谷歌","zifan","alu456")
+##    ac.add(u"yahoo","dongtian","alu456")
+##    #ac.get(u"谷歌")
+##    ac.remove(u"yahoo",2)
+##    print ac.getAllLatest()
+##    #ac.getAllRecodsForMeta(u"谷歌1")
+## #   print genRecord(u"谷歌","zifan","alu123")
+    #print ac.getAllRecodsForMeta("meta-23","user-23")
+    print ac.getAllMetaId()
 if __name__ == '__main__':
     main()

@@ -4,7 +4,6 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"manpassd/passsql"
@@ -36,7 +35,14 @@ func (csvr ClientAPISVR) routeClient(resp http.ResponseWriter, req *http.Request
 	case "POST":
 		csvr.addRecord(resp, req)
 	case "GET":
-		csvr.getRecord(resp, req)
+		log.Println(req.URL.Path)
+		if req.URL.Path == "/client/meta-id" {
+			csvr.getAllMetaId(resp, req)
+
+		} else {
+			csvr.getRecord(resp, req)
+		}
+
 	case "DELETE":
 		csvr.delRecord(resp, req)
 	case "PUT":
@@ -50,9 +56,11 @@ func (csvr ClientAPISVR) ServeHTTP(resp http.ResponseWriter, req *http.Request) 
 	if remote_addr != "127.0.0.1" {
 		log.Printf("Client %s is not from local host", remote_addr)
 	}
-	if req.URL.Path == "/client" {
+	if strings.HasPrefix(req.URL.Path, "/client") {
 		csvr.routeClient(resp, req)
-
+	} else {
+		resp.WriteHeader(http.StatusNotFound)
+		return
 	}
 
 }
@@ -158,6 +166,28 @@ func (csvr ClientAPISVR) delRecord(resp http.ResponseWriter, req *http.Request) 
 		resp.WriteHeader(http.StatusOK)
 	}
 
+	return
+
+}
+
+func (csvr ClientAPISVR) getAllMetaId(resp http.ResponseWriter, req *http.Request) {
+	rlist, err := csvr.PDB.GetAllMetaId(csvr.Tablename)
+	if err != nil {
+		resp.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if len(rlist) == 0 {
+		resp.WriteHeader(http.StatusNoContent)
+		return
+
+	}
+	js, err := json.Marshal(rlist)
+	if err != nil {
+		resp.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	resp.WriteHeader(http.StatusOK)
+	fmt.Fprintf(resp, string(js))
 	return
 
 }

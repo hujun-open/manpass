@@ -212,6 +212,25 @@ func (pdb PassDB) GetAllLatest(tablename string) ([]PassRecord, error) {
 
 }
 
+func (pdb PassDB) GetAllMetaId(tablename string) ([]string, error) {
+	var metaid_list []string
+	rows, err := pdb.PDB.Query(fmt.Sprintf("select distinct(meta_id) from %s", tablename))
+	if err != nil {
+		return nil, err
+
+	}
+	defer rows.Close()
+	var mid string
+	for rows.Next() {
+		err := rows.Scan(&mid)
+		if err == nil {
+			metaid_list = append(metaid_list, mid)
+		}
+	}
+	return metaid_list, nil
+
+}
+
 func (pdb PassDB) GetAllRevForMetaId(tablename string, meta_id string) ([]PassRecord, error) {
 	//return all records for a given meta-id
 	rlist := []PassRecord{}
