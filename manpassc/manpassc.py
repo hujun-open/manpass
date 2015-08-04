@@ -9,7 +9,7 @@ import wx
 # begin wxGlade: dependencies
 import gettext
 # end wxGlade
-
+import time
 import common
 import os.path
 import loginDiag
@@ -23,6 +23,7 @@ import wx.dataview
 import shlex
 import subprocess
 import threading
+import multiprocessing
 
 # begin wxGlade: extracode
 # end wxGlade
@@ -316,10 +317,10 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
         dlg.ShowModal()
         try:
             r=self.apc.get(self.passlist[i]['Meta'],self.passlist[i]['Uname'])
+            del self.passlist[i]
             if r!=None:
                 r["PYS"]=self.cnsort.strToPYS(r["Meta"].lower())
                 self.passlist.insert(i,r)
-            del self.passlist[i]
             self.reloadWithoutGet()
         except Exception as Err:
             wx.MessageBox(_("Getting latest record failed!\n")+unicode(type(Err))+" "+unicode(Err),_("Error"),0|wx.ICON_ERROR,self)
@@ -341,18 +342,20 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
 
 
 class MainPannel(wx.Frame):
-    def __init__(self, *args, **kwds):
+    def __init__(self, parent,dpool,epool):
         # begin wxGlade: MainPannel.__init__
         self.version=1.0
         self.canlock=True
-        kwds['size']=(1000,1000)
-        wx.Frame.__init__(self, *args, **kwds)
+        wx.Frame.__init__(self,parent,size=(1000,1000))
+        self.DWorkerPool=dpool
+        self.EWrokerPool=epool
         self.icon=wx.Icon(os.path.join(common.cur_file_dir(),"manpassc.ico"),wx.BITMAP_TYPE_ICO)
         self.SetIcon(self.icon)
         diag=loginDiag.LoginDiag(self)
         diag.CentreOnScreen()
         if diag.ShowModal()!=wx.ID_OK:
-            self.Close()
+            self.Hide()
+            self.ExitMe()
             return
         #username, password must be encoded into utf-8 string before they could be used by crypto functions
         self.uname=diag.text_ctrl_uname.GetValue().strip().encode('utf-8')
@@ -393,7 +396,8 @@ class MainPannel(wx.Frame):
         try:
             self.apiclient=apiclient.APIClient(self.confDict['addr'],self.confDict['port'],cadata,
             os.path.join(self.confDict["confDir"],"ee.cert"),
-            os.path.join(self.confDict["confDir"],"ee.key"),self.upass)
+            os.path.join(self.confDict["confDir"],"ee.key"),self.upass,
+            self.DWorkerPool,self.EWrokerPool)
         except:
             wx.MessageBox(_("Failed to connect to the server!"),_("Error"),0|wx.ICON_ERROR,self)
             self.Close()
@@ -439,7 +443,7 @@ class MainPannel(wx.Frame):
         self.Bind(common.EVT_MANPASS_FATALERR,self.OnFatal)
         self.Bind(common.EVT_MANPASS_PROGRESS,self.UpdateProgress)
         self.Bind(common.EVT_MANPASS_LOAD_DONE,self.LoadDone)
-
+        self.Show(True)
 
 
         # end wxGlade
@@ -553,8 +557,14 @@ class MainPannel(wx.Frame):
 
     def ExitMe(self):
         #do some cleanup
-        self.taskicon.RemoveIcon()
-        self.taskicon.Destroy()
+        if hasattr(self,"taskicon"):
+            self.taskicon.RemoveIcon()
+            self.taskicon.Destroy()
+
+        self.Hide()
+        self.DWorkerPool.destruct()
+        self.EWrokerPool.destruct()
+
         self.Destroy()
 
     def OnTimer(self,evt):
@@ -566,6 +576,7 @@ class MainPannel(wx.Frame):
         self.timer_lock.Start(self.confDict['idle_timer']*1000,wx.TIMER_CONTINUOUS)
         if evt!=None:
             evt.Skip()
+
 
     def showOptionDiag(self):
         self.OptionDiag.ShowModal()
@@ -596,14 +607,53 @@ class MainPannel(wx.Frame):
 
 
 
+class MyApp(wx.App):
+    def __init__(self,d_worker_pool,e_worker_pool):
+        self.DWorkerPool=d_worker_pool
+        self.EWorkerPool=e_worker_pool
+        wx.App.__init__(self,False,"manpass.log")
 
+    def OnInit(self):
+        self.mainwin=MainPannel(None,self.DWorkerPool,self.EWorkerPool)
+        self.SetTopWindow(self.mainwin)
+        return True
+
+    def OnExit(self):
+        self.mainwin.ExitMe()
 
 # end of class MainPannel
 
-if __name__ == "__main__":
-    logfilename="manpass.log"
-    app = wx.App(False,logfilename)
-    mainwin=MainPannel(parent=None)
-    mainwin.Show()
-    app.SetTopWindow(mainwin)
+class MyWorkerPool:
+    def __init__(self,target):
+        self.process_list=[]
+        self.taskQ=multiprocessing.Queue()
+        self.doneQ=multiprocessing.Queue()
+        proc_count=multiprocessing.cpu_count()-1
+        if proc_count<1:
+            proc_count=1
+        for n in range(proc_count): #minus one to leave some CPU resource for other tasks
+            p=multiprocessing.Process(target=target,args=(self.taskQ, self.doneQ))
+            p.start()
+            self.process_list.append(p)
+
+    def destruct(self):
+        for p in self.process_list:
+            p.terminate()
+        isalive = 1
+        while isalive:
+            isalive = 0
+            for p in self.process_list:
+                isalive = isalive + p.is_alive()
+            time.sleep(0.5)
+
+
+def main():
+    Dpool=MyWorkerPool(apiclient.decryptRecordWithSingleSalt)
+    Epool=MyWorkerPool(apiclient.genRecord)
+    app=MyApp(Dpool,Epool)
     app.MainLoop()
+
+if __name__ == "__main__":
+    multiprocessing.freeze_support()
+    main()
+

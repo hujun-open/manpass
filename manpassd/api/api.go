@@ -35,7 +35,6 @@ func (csvr ClientAPISVR) routeClient(resp http.ResponseWriter, req *http.Request
 	case "POST":
 		csvr.addRecord(resp, req)
 	case "GET":
-		log.Println(req.URL.Path)
 		if req.URL.Path == "/client/meta-id" {
 			csvr.getAllMetaId(resp, req)
 
@@ -69,7 +68,11 @@ func (csvr ClientAPISVR) parseReq(req *http.Request) (map[string]interface{}, er
 	//parse the json in the HTTP request body, return a map
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
+		log.Println(err)
 		return nil, err
+	}
+	if string(body) == "" {
+		return nil, nil
 	}
 	x := make(map[string]interface{})
 	err = json.Unmarshal(body, &x)
@@ -236,7 +239,7 @@ func (csvr ClientAPISVR) getRecord(resp http.ResponseWriter, req *http.Request) 
 		resp.WriteHeader(http.StatusOK)
 		fmt.Fprintf(resp, string(js))
 
-	} else {
+	} else if _, ok = x["meta_id"]; ok {
 		r, err := csvr.PDB.GetAllRevForMetaId(csvr.Tablename, x["meta_id"].(string))
 		if err != nil {
 			resp.WriteHeader(http.StatusInternalServerError)
@@ -248,6 +251,25 @@ func (csvr ClientAPISVR) getRecord(resp http.ResponseWriter, req *http.Request) 
 		}
 		js, err := json.Marshal(r)
 		if err != nil {
+			resp.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		resp.WriteHeader(http.StatusOK)
+		fmt.Fprintf(resp, string(js))
+	} else {
+		r, err := csvr.PDB.GetAll(csvr.Tablename)
+		if err != nil {
+			log.Println(err)
+			resp.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if len(r) == 0 {
+			resp.WriteHeader(http.StatusNoContent)
+			return
+		}
+		js, err := json.Marshal(r)
+		if err != nil {
+			log.Println(err)
 			resp.WriteHeader(http.StatusInternalServerError)
 			return
 		}

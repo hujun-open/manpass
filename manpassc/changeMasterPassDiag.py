@@ -151,19 +151,10 @@ class ChangeMasterPassDiag(wx.Dialog):
 
         def replacethem(self):
             try:
-                pevt=common.ManpassProgressLabel(Label=_("Getting the latest list"))
-                wx.PostEvent(self,pevt)
                 listctrl=self.GetParent()
-                mlist=listctrl.apc.getAllMetaId()
-                rlist=[]
                 pevt=common.ManpassProgressLabel(Label=_("Getting history passwords"))
                 wx.PostEvent(self,pevt)
-                i=0
-                for m in mlist:
-                    i+=1
-                    pevt=common.ManpassProgressEVT(Range=len(mlist),Pos=i)
-                    wx.PostEvent(self,pevt)
-                    rlist+=listctrl.apc.getAllRecodsForMeta(mid=m,win=None)
+                rlist=listctrl.apc.getAll(win=self)
                 pevt=common.ManpassProgressLabel(Label=_("Re-Encrypting files"))
                 wx.PostEvent(self,pevt)
                 common.reEncryptCertFiles(listctrl.GetParent().confDict['confDir'],self.currentpass.encode("utf-8"),self.pass1.encode('utf-8'))

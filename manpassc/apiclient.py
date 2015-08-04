@@ -22,8 +22,12 @@ import json
 import common
 import os.path
 import wx
+import multiprocessing
+import traceback
 
 _ = wx.GetTranslation
+
+
 
 def loadCAFile(uname,passwd,fpath):
     #load a encrypted CA cert encoded in Base32
@@ -56,7 +60,7 @@ class APITransactionError(Exception):
 
 
 class APIClient:
-    def __init__(self,svrhost,svrport,cadata,certfile,keyfile,masterpass):
+    def __init__(self,svrhost,svrport,cadata,certfile,keyfile,masterpass,dpool,epool):
         #cadata is DER encoded CA cert, string
         #certfile/keyfile is filename/path of PEM encoded file
         #keyfile is encrypted PEM
@@ -67,14 +71,24 @@ class APIClient:
         self.ctx.verify_mode=ssl.CERT_REQUIRED
         self.conn=httplib.HTTPSConnection(svrhost,svrport,context=self.ctx)
         self.urlpath="/client"
+        self.DWorkerPool=dpool
+        self.EWorkerPool=epool
 
     def add(self,meta,uname,passwd):
-        body=json.dumps(self.genRecord(meta,uname,passwd))
+        self.EWorkerPool.taskQ.put((meta,uname,passwd,-1,self.masterpass))
+        body=json.dumps(self.EWorkerPool.doneQ.get())
         self.conn.request("POST",self.urlpath,body)
         resp=self.conn.getresponse()
         if resp.status!=201:
             raise APITransactionError(self.conn,"Failed to create record")
         resp.read()
+
+
+    def addlist(self,plist,win=None):
+        for p in plist:
+            self.EWorkerPool.taskQ.put(p['meta'],p['uname'],p['pass'],-1,self.masterpass)
+
+
 
 
     def get(self,meta,uname,pass_rev=-1):
@@ -92,8 +106,9 @@ class APIClient:
         else:
             raw_body=resp.read()
             r=json.loads(raw_body)
-            self.decryptRecordWithSingleSalt(r)
-            return r
+            self.DWorkerPool.taskQ.put((r,self.masterpass))
+            nr=self.DWorkerPool.doneQ.get()
+            return nr
 
     def remove(self,meta,uname,pass_rev=None):
         meta_id=genMetaid(meta,uname)
@@ -133,10 +148,16 @@ class APIClient:
             else:
                 raw_body=resp.read()
                 rlist=json.loads(raw_body)
+##                for r in rlist:
+##                    self.decryptRecordWithSingleSalt(r)
                 for r in rlist:
-                    self.decryptRecordWithSingleSalt(r)
+                    self.DWorkerPool.taskQ.put((r,self.masterpass))
+                nr_list=[]
+                list_len=len(rlist)
+                for i in range(list_len):
+                    nr_list.append(self.DWorkerPool.doneQ.get())
                 if win!=None:
-                    devt=common.ManpassLoadingDone(plist=rlist)
+                    devt=common.ManpassLoadingDone(plist=nr_list)
                     wx.PostEvent(win,devt)
                 return rlist
         except Exception as Err:
@@ -164,6 +185,50 @@ class APIClient:
             return rlist
 
 
+    def getAll(self,win=None):
+        try:
+            self.conn.connect()
+            self.conn.request("GET",self.urlpath)
+            resp=self.conn.getresponse()
+            if resp.status !=200:
+                resp.read()
+                if resp.status==204:
+                    if win!=None:
+                        resp.read()
+                        fevt=common.ManpassLoadingDone(Passlist=[])
+                        wx.PostEvent(win,fevt)
+                    return []
+                else:
+                    print resp.status
+                    raise APITransactionError(self.conn,"Failed to get record")
+            else:
+                raw_body=resp.read()
+                rlist=json.loads(raw_body)
+
+                for r in rlist:
+                    self.DWorkerPool.taskQ.put((r,self.masterpass))
+                nr_list=[]
+                i=0
+                list_len=len(rlist)
+                for i in range(list_len):
+                    nr_list.append(self.DWorkerPool.doneQ.get())
+                    pevt=common.ManpassProgressEVT(Range=list_len,Pos=i)
+                    wx.PostEvent(win,pevt)
+                    i+=1
+                if win!=None:
+                    fevt=common.ManpassLoadingDone(Passlist=nr_list)
+                    wx.PostEvent(win,fevt)
+                return nr_list
+        except Exception as Err:
+            traceback.print_exc(Err)
+            if win!=None:
+                eevt=common.ManpassFatalErrEVT(Value=_("Unable to get reconds!\n")+unicode(Err))
+                wx.PostEvent(win,eevt)
+                return []
+            else:
+                raise Err
+
+
 
 
     def getAllLatest(self,win=None):
@@ -185,18 +250,25 @@ class APIClient:
             else:
                 raw_body=resp.read()
                 rlist=json.loads(raw_body)
-                i=0
+
                 for r in rlist:
-                    self.decryptRecordWithSingleSalt(r)
+                    self.DWorkerPool.taskQ.put((r,self.masterpass))
+                nr_list=[]
+                i=0
+                list_len=len(rlist)
+                for i in range(list_len):
+                    nr_list.append(self.DWorkerPool.doneQ.get())
+                    pevt=common.ManpassProgressEVT(Range=list_len,Pos=i)
+                    wx.PostEvent(win,pevt)
                     i+=1
-                    if win!=None:
-                        uevt=common.ManpassProgressEVT(Range=len(rlist),Pos=i)
-                        wx.PostEvent(win,uevt)
+
+
                 if win!=None:
-                    fevt=common.ManpassLoadingDone(Passlist=rlist)
+                    fevt=common.ManpassLoadingDone(Passlist=nr_list)
                     wx.PostEvent(win,fevt)
-                return rlist
+                return nr_list
         except Exception as Err:
+            traceback.print_exc(Err)
             if win!=None:
                 eevt=common.ManpassFatalErrEVT(Value=_("Unable to get reconds!\n")+unicode(Err))
                 wx.PostEvent(win,eevt)
@@ -208,14 +280,15 @@ class APIClient:
     def replaceAll(self,rlist,newpass,win=None):
         reqlist=[]
         i=0
+
         for r in rlist:
-            if win!=None:
-                i+=1
-                pevt=common.ManpassProgressEVT(Range=len(rlist),Pos=i)
-                wx.PostEvent(win,pevt)
-            req=self.genRecord(r['Meta'],r['Uname'],r['Pass'],newpass)
-            req['pass_rev']=r['Pass_rev']
-            reqlist.append(req)
+            self.EWorkerPool.taskQ.put((r['Meta'],r['Uname'],r['Pass'],r['Pass_rev'],newpass))
+        list_len=len(rlist)
+        for i in range(list_len):
+            reqlist.append(self.EWorkerPool.doneQ.get())
+            pevt=common.ManpassProgressEVT(Range=list_len,Pos=i)
+            wx.PostEvent(win,pevt)
+            i+=1
         body=json.dumps(reqlist)
         self.conn.request("PUT",self.urlpath,body)
         resp=self.conn.getresponse()
@@ -224,64 +297,84 @@ class APIClient:
         resp.read()
 
 
-    def genRecord(self,meta,uname,passwd,mpass=None):
-        #return a record, meta,uname,passwd are encrypted with passwd
-        r={}
-        n_meta=meta
-        n_uname=uname
-        n_passwd=passwd
-        if isinstance(meta,unicode):
-            n_meta=meta.encode("utf-8")
-        if isinstance(uname,unicode):
-            n_uname=uname.encode("utf-8")
-        if isinstance(passwd,unicode):
-            n_passwd=passwd.encode("utf-8")
-        r['meta_id']=genMetaid(meta,uname)
-        salt=passcrypto.GenerateSalt()
-        if mpass==None:
-            mp=self.masterpass
-        else:
+##    def genRecord(self,meta,uname,passwd,mpass=None):
+##        #return a record, meta,uname,passwd are encrypted with passwd
+##        r={}
+##        n_meta=meta
+##        n_uname=uname
+##        n_passwd=passwd
+##        if isinstance(meta,unicode):
+##            n_meta=meta.encode("utf-8")
+##        if isinstance(uname,unicode):
+##            n_uname=uname.encode("utf-8")
+##        if isinstance(passwd,unicode):
+##            n_passwd=passwd.encode("utf-8")
+##        r['meta_id']=genMetaid(meta,uname)
+##        salt=passcrypto.GenerateSalt()
+##        if mpass==None:
+##            mp=self.masterpass
+##        else:
+##            mp=mpass
+##        skey=passcrypto.GenerateEncKey(mp,salt)
+##        r['meta']=passcrypto.EncryptWithoutSaltBase32(n_meta,skey,salt)
+##        r['uname']=passcrypto.EncryptWithoutSaltBase32(n_uname,skey,salt)
+##        r['pass']=passcrypto.EncryptWithoutSaltBase32(n_passwd,skey,salt)
+##        #return json.dumps(r)
+##        return r
+
+def genRecord(inputQ,outputQ):
+    #return a record, meta,uname,passwd are encrypted with passwd
+    try:
+        while True:
+            (meta,uname,passwd,pass_rev,mpass)=inputQ.get()
+            r={}
+            n_meta=meta
+            n_uname=uname
+            n_passwd=passwd
+            if isinstance(meta,unicode):
+                n_meta=meta.encode("utf-8")
+            if isinstance(uname,unicode):
+                n_uname=uname.encode("utf-8")
+            if isinstance(passwd,unicode):
+                n_passwd=passwd.encode("utf-8")
+            r['meta_id']=genMetaid(meta,uname)
+            salt=passcrypto.GenerateSalt()
             mp=mpass
-        skey=passcrypto.GenerateEncKey(mp,salt)
-        r['meta']=passcrypto.EncryptWithoutSaltBase32(n_meta,skey,salt)
-        r['uname']=passcrypto.EncryptWithoutSaltBase32(n_uname,skey,salt)
-        r['pass']=passcrypto.EncryptWithoutSaltBase32(n_passwd,skey,salt)
-        #return json.dumps(r)
-        return r
-
-
-    def decryptRecordWithSingleSalt(self,cipherR):
-        enc=nacl.encoding.Base32Encoder()
-        ds=enc.decode(cipherR['Pass'])
-        skey=passcrypto.GenerateEncKey(self.masterpass,ds[:passcrypto.SaltSize])
-        for k,v in cipherR.items():
-            if k=='Uname'  or k=='Meta':
-                ds=enc.decode(v)
-                cipherR[k]=passcrypto.DecryptWithoutSalt(ds[passcrypto.SaltSize:],skey)
-
-        for k,v in cipherR.items():
-            if k=="Uname" or k=="Meta":
-                cipherR[k]=cipherR[k].decode('utf-8')
-        cipherR["Pass_time"]=common.getLocalTime(cipherR['Pass_time'])
+            skey=passcrypto.GenerateEncKey(mp,salt)
+            r['meta']=passcrypto.EncryptWithoutSaltBase32(n_meta,skey,salt)
+            r['uname']=passcrypto.EncryptWithoutSaltBase32(n_uname,skey,salt)
+            r['pass']=passcrypto.EncryptWithoutSaltBase32(n_passwd,skey,salt)
+            if pass_rev!=-1:
+                r['pass_rev']=pass_rev
+            #return json.dumps(r)
+            outputQ.put(r)
+    except Exception as Err:
+        print traceback.format_exc()
 
 
 
-def main():
-    upass="zifan234"
-    uname="hujun"
-    cadata=loadCAFile(uname,upass,common.getConfDir(uname))
-    ac=APIClient("127.0.0.1",8030,cadata,
-        os.path.join(common.getConfDir(uname),"ee.cert"),
-        os.path.join(common.getConfDir(uname),"ee.key"),upass)
-##    ac.add(u"谷歌","zifan","alu123")
-##    ac.add(u"谷歌","zifan","alu456")
-##    ac.add(u"yahoo","dongtian","alu456")
-##    #ac.get(u"谷歌")
-##    ac.remove(u"yahoo",2)
-##    print ac.getAllLatest()
-##    #ac.getAllRecodsForMeta(u"谷歌1")
-## #   print genRecord(u"谷歌","zifan","alu123")
-    #print ac.getAllRecodsForMeta("meta-23","user-23")
-    print ac.getAllMetaId()
-if __name__ == '__main__':
-    main()
+
+def decryptRecordWithSingleSalt(inputQ,outputQ):
+    try:
+        while True:
+            (cipherR,masterpass)=inputQ.get()
+            RR={}
+            enc=nacl.encoding.Base32Encoder()
+            ds=enc.decode(cipherR['Pass'])
+            skey=passcrypto.GenerateEncKey(masterpass,ds[:passcrypto.SaltSize])
+            for k,v in cipherR.items():
+                if k=='Uname' or k=="Pass" or k=='Meta':
+                    ds=enc.decode(v)
+                    RR[k]=passcrypto.DecryptWithoutSalt(ds[passcrypto.SaltSize:],skey)
+
+            for k,v in RR.items():
+                if k=="Uname" or k=="Meta":
+                    RR[k]=RR[k].decode('utf-8')
+            RR["Pass_rev"]=cipherR['Pass_rev']
+            RR["Pass_time"]=common.getLocalTime(cipherR['Pass_time'])
+            outputQ.put(RR)
+    except Exception as Err:
+        print traceback.format_exc()
+
+
+
