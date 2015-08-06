@@ -12,8 +12,6 @@ import os.path
 import gettext
 # end wxGlade
 import genPassDiag
-import shlex
-import subprocess
 import time
 import threading
 import Queue
@@ -48,8 +46,8 @@ class ChangeMasterPassDiag(wx.Dialog):
         self.__do_layout()
 
 
-        okb= self.bsizer.GetItem(1).GetWindow()
-        canb=self.bsizer.GetItem(2).GetWindow()
+        okb=self.bsizer.GetAffirmativeButton()
+        canb=self.bsizer.GetCancelButton()
         self.Bind(wx.EVT_BUTTON,self.OnOK,okb)
         self.Bind(wx.EVT_BUTTON,self.OnCancel,canb)
         self.Bind(common.EVT_MANPASS_ERR,self.OnErr)
@@ -104,8 +102,8 @@ class ChangeMasterPassDiag(wx.Dialog):
         self.text_ctrl_currentpass.Disable()
         self.text_ctrl_upass1.Disable()
         self.text_ctrl_upass2.Disable()
-        okb= self.bsizer.GetItem(1).GetWindow()
-        canb=self.bsizer.GetItem(2).GetWindow()
+        okb=self.bsizer.GetAffirmativeButton()
+        canb=self.bsizer.GetCancelButton()
         self.orig_label=okb.GetLabel()
         okb.Disable()
         canb.Disable()
@@ -114,8 +112,8 @@ class ChangeMasterPassDiag(wx.Dialog):
         self.text_ctrl_currentpass.Enable()
         self.text_ctrl_upass1.Enable()
         self.text_ctrl_upass2.Enable()
-        okb= self.bsizer.GetItem(1).GetWindow()
-        canb=self.bsizer.GetItem(2).GetWindow()
+        okb=self.bsizer.GetAffirmativeButton()
+        canb=self.bsizer.GetCancelButton()
         okb.SetLabel(self.orig_label)
         okb.Enable()
         canb.Enable()
@@ -143,7 +141,7 @@ class ChangeMasterPassDiag(wx.Dialog):
             self.enableMe()
             return
         try:
-            newUserDiag.goodPass(self.pass1)
+            newUserDiag.goodPass(self.pass1,self.GetParent().GetParent().uname.decode("utf-8"))
         except Exception as Err:
             wx.MessageBox(_("Not a good password, choose a different password\n")+unicode(Err),_("Error"),0|wx.ICON_ERROR,self)
             self.enableMe()

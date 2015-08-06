@@ -43,6 +43,20 @@ def getRootConfDir():
     myos=platform.system()
     if myos=="Windows":
         return os.path.join(os.environ["APPDATA"],"manpass")
+    if myos=="Linux":
+        cdir=os.path.join(os.environ["HOME"],".manpass")
+        if not os.path.isdir(cdir):
+            os.mkdir(cdir,0700)
+        return cdir
+
+
+
+def getManpassdExeName():
+    myos=platform.system()
+    if myos=="Windows":
+        return os.path.join(cur_file_dir(),"manpassd.exe")
+    if myos=="Linux":
+        return os.path.join(cur_file_dir(),"manpassd")
 
 
 def getNewPort():

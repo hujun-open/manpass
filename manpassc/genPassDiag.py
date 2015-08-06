@@ -38,8 +38,8 @@ class GenPassDiag(wx.Dialog):
         self.__set_properties()
         self.__do_layout()
         self.Centre()
-        okb= self.bsizer.GetItem(1).GetWindow()
-        canb=self.bsizer.GetItem(2).GetWindow()
+        okb=self.bsizer.GetAffirmativeButton()
+        canb=self.bsizer.GetCancelButton()
         self.Bind(wx.EVT_BUTTON,self.OnOK,okb)
         self.Bind(wx.EVT_BUTTON,self.OnCancel,canb)
 

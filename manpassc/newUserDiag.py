@@ -18,6 +18,8 @@ import time
 import threading
 import Queue
 import sys
+import platform
+import string
 
 
 
@@ -28,10 +30,30 @@ _ = wx.GetTranslation
 MINIMALPASSLEN=8
 MINIMALUNAMELEN=3
 
-def goodPass(upass):
+def goodPass(upass,uname):
+    #upass and uname must be unicode
     if len(upass)<MINIMALPASSLEN:
         raise ValueError(_("the password length must be >=")+unicode(MINIMALPASSLEN))
+    if upass.find(uname)!=-1:
+        raise ValueError(_("password can't contain user name"))
+    hasdigit=0
+    hasup=0
+    haspunction=0
+    haslow=0
+    for c in upass:
+        if c in string.digits:
+            hasdigit=1
+        if c in string.uppercase:
+            hasup=1
+        if c in string.punctuation:
+            haspunction=1
+        if c in string.lowercase:
+            haslow=1
+    if hasdigit+hasup+haspunction+haslow<=2:
+        raise ValueError(_("password need to contain characters from at least 3 different kinds: uppercase, lowercase, digits and punctuation"))
+
     return True
+
 
 def goodName(uname):
     if len(uname)<MINIMALUNAMELEN:
@@ -71,8 +93,8 @@ class NewUserDiag(wx.Dialog):
         self.__do_layout()
 
 
-        okb= self.bsizer.GetItem(1).GetWindow()
-        canb=self.bsizer.GetItem(2).GetWindow()
+        okb=self.bsizer.GetAffirmativeButton()
+        canb=self.bsizer.GetCancelButton()
         self.Bind(wx.EVT_BUTTON,self.OnOK,okb)
         self.Bind(wx.EVT_BUTTON,self.OnCancel,canb)
 
@@ -110,8 +132,8 @@ class NewUserDiag(wx.Dialog):
         self.text_ctrl_uname.Disable()
         self.text_ctrl_upass1.Disable()
         self.text_ctrl_upass2.Disable()
-        okb= self.bsizer.GetItem(1).GetWindow()
-        canb=self.bsizer.GetItem(2).GetWindow()
+        okb=self.bsizer.GetAffirmativeButton()
+        canb=self.bsizer.GetCancelButton()
         okb.Disable()
         canb.Disable()
 
@@ -119,8 +141,8 @@ class NewUserDiag(wx.Dialog):
         self.text_ctrl_uname.Enable()
         self.text_ctrl_upass1.Enable()
         self.text_ctrl_upass2.Enable()
-        okb= self.bsizer.GetItem(1).GetWindow()
-        canb=self.bsizer.GetItem(2).GetWindow()
+        okb=self.bsizer.GetAffirmativeButton()
+        canb=self.bsizer.GetCancelButton()
         okb.Enable()
         canb.Enable()
 
@@ -155,18 +177,22 @@ class NewUserDiag(wx.Dialog):
             self.enableMe()
             return
         try:
-            goodPass(pass1)
+            goodPass(pass1,self.uname)
         except Exception as Err:
             wx.MessageBox(_("Not a good password, choose a different password\n")+unicode(Err),_("Error"),0|wx.ICON_ERROR,self)
             b.SetLabel(orig_label)
             self.enableMe()
             return
         uport=common.getNewPort()
-        cmd="manpassd -username={uname} -create=true -pipepass=true -svrport={port}".format(uname=self.uname,port=uport)
+        exename=common.getManpassdExeName()
+        cmd=exename+" -username={uname} -create=true -pipepass=true -svrport={port}".format(uname=self.uname,port=uport)
         args=shlex.split(cmd)
-        startupinfo = subprocess.STARTUPINFO()
-        startupinfo.dwFlags|= subprocess.STARTF_USESHOWWINDOW
-        p=subprocess.Popen(args,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,startupinfo=startupinfo)
+        if platform.system()=="Windows":
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags|= subprocess.STARTF_USESHOWWINDOW
+        else:
+            startupinfo = None
+        p=subprocess.Popen(args,executable=exename,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,startupinfo=startupinfo)
 
         ON_POSIX = 'posix' in sys.builtin_module_names
         def enqueue_output(out, queue):

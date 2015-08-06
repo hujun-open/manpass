@@ -50,7 +50,7 @@ func main() {
 		}
 		os.Remove(confDir)
 		fmt.Println("creating needed files...\n")
-		err = os.MkdirAll(confDir, 700)
+		err = os.MkdirAll(confDir, 0700)
 		if err != nil {
 			log.Fatalf("Failed to create directory:%s\n", confDir)
 		}

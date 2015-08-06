@@ -10,6 +10,7 @@ import wx
 import gettext
 # end wxGlade
 import time
+import platform
 import common
 import os.path
 import loginDiag
@@ -24,10 +25,12 @@ import shlex
 import subprocess
 import threading
 import multiprocessing
+import traceback
 
 # begin wxGlade: extracode
 # end wxGlade
 _ = wx.GetTranslation
+
 
 
 
@@ -80,9 +83,9 @@ class cnsort:
                 return None
         rstr=''
         for ichr in istr:
-           if ord(ichr)<=255:rstr+=ichr
-           else:
-               rstr+=self.searchdict(self.dic_py,ichr)[:-1]
+            if ord(ichr)<=255:rstr+=ichr
+            else:
+                rstr+=self.searchdict(self.dic_py,ichr)[:-1]
         return rstr
 
 
@@ -142,7 +145,7 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
         filter_key=self.fctrl.GetValue().strip()
         i=0
         for p in self.passlist:
-            data=[p['Meta'],p['Uname'],u"****",p['Pass_time'],p['Pass_rev']]
+            data=[p['Meta'],p['Uname'],u"****",p['Pass_time'],unicode(p['Pass_rev'])]
             if filter_key=="" or not self.filterme:
                 self.AppendItem(data,i)
             else:
@@ -177,8 +180,10 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
             if dkey=="Uname": itemname=_("Username")
             dlg = wx.MessageDialog(self, itemname+_(' Copied to Clipboard'),
                            _('Done'),
-                           wx.OK | wx.ICON_INFORMATION
-                                                          )
+                           wx.OK | wx.ICON_INFORMATION)
+            if dkey=="Pass":
+                self.GetParent().StartClearTimer(self.passlist[i][dkey])
+
         else:
             dlg = wx.MessageDialog(self,itemname+_(' Copy Failed'),
                            _('Error'),
@@ -346,6 +351,7 @@ class MainPannel(wx.Frame):
         # begin wxGlade: MainPannel.__init__
         self.version=1.0
         self.canlock=True
+        self.last_copied_pass=None
         wx.Frame.__init__(self,parent,size=(1000,1000))
         self.DWorkerPool=dpool
         self.EWrokerPool=epool
@@ -376,13 +382,16 @@ class MainPannel(wx.Frame):
         self.OptionDiag=myoptions.OptionDiag(self,"manpass.conf",defconflist,self.uname)
         self.confDict=None
         self.confDict=self.OptionDiag.toDict()
-        cmd=os.path.join(common.cur_file_dir(),"manpassd.exe")
+        cmd=common.getManpassdExeName()
         exename=cmd
 
         cmd+=" -username={uname} -pipepass=true -svrip={ip} -svrport={port}".format(uname=self.uname,ip=self.confDict['addr'],port=self.confDict['port'])
         args=shlex.split(cmd)
-        startupinfo = subprocess.STARTUPINFO()
-        startupinfo.dwFlags|= subprocess.STARTF_USESHOWWINDOW
+        if platform.system()=="Windows":
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags|= subprocess.STARTF_USESHOWWINDOW
+        else:
+            startupinfo = None
         p=subprocess.Popen(args,executable=exename, stdin=subprocess.PIPE,shell=False,startupinfo=startupinfo)
         p.stdin.write(self.upass+"\n")
         p.stdin.close()
@@ -391,29 +400,37 @@ class MainPannel(wx.Frame):
             cadata=apiclient.loadCAFile(self.uname,self.upass,self.confDict['confDir'])
         except Exception as Err:
             wx.MessageBox(_("Authentication Failed!\n")+unicode(Err),_("Error"),0|wx.ICON_ERROR,self)
-            self.Close()
+            self.ExitMe()
             return
         try:
             self.apiclient=apiclient.APIClient(self.confDict['addr'],self.confDict['port'],cadata,
             os.path.join(self.confDict["confDir"],"ee.cert"),
             os.path.join(self.confDict["confDir"],"ee.key"),self.upass,
             self.DWorkerPool,self.EWrokerPool)
-        except:
+        except Exception as Err:
+            traceback.print_exc(Err)
             wx.MessageBox(_("Failed to connect to the server!"),_("Error"),0|wx.ICON_ERROR,self)
-            self.Close()
+            self.ExitMe()
             return
 
         self.SetTitle("Manpass - "+self.uname.decode("utf-8"))
         self.taskicon=wx.TaskBarIcon()
-        self.taskicon.SetIcon(self.icon)
-        wx.EVT_TASKBAR_LEFT_DCLICK(self.taskicon,self.OnDClickTaskIcon)
-        self.timer_lock=wx.Timer(self)
+        if self.taskicon.IsAvailable() and platform.system()!="Linux":
+            self.taskicon.SetIcon(self.icon)
+            wx.EVT_TASKBAR_LEFT_DCLICK(self.taskicon,self.OnDClickTaskIcon)
+            self.Bind(wx.EVT_CLOSE,self.HideMe)
+        else:
+            self.Bind(wx.EVT_CLOSE,self.ExitMe)
+        self.timer_lock=wx.Timer(self,wx.NewId())
+        self.timer_clear=wx.Timer(self,wx.NewId())
         self.timer_lock.Start(self.confDict['idle_timer']*1000,wx.TIMER_CONTINUOUS)
         self.text_ctrl_search_input = wx.SearchCtrl(self, wx.NewId(),"")
         self.list_ctrl_1 = PassListCtrl(self,self.text_ctrl_search_input)
 
 
-        self.Bind(wx.EVT_TIMER,self.OnTimer)
+        self.Bind(wx.EVT_TIMER,self.OnTimerLock,self.timer_lock)
+        self.Bind(wx.EVT_TIMER,self.OnTimerClear,self.timer_clear)
+
         self.Bind(wx.EVT_TEXT,self.OnFilter,self.text_ctrl_search_input)
         self.text_ctrl_search_input.Bind(wx.EVT_SET_FOCUS,self.OnFilterAct)
         self.text_ctrl_search_input.Bind(wx.EVT_CHAR,self.OnChar)
@@ -422,13 +439,12 @@ class MainPannel(wx.Frame):
         self.__set_properties()
         self.__do_layout()
         self.CentreOnScreen()
-        self.Show()
         self.SetSize((400,400))
         self.list_ctrl_1.reload()
         self.text_ctrl_search_input.SetFocus()
         self.text_ctrl_search_input.SetValue("")
 
-        self.Bind(wx.EVT_CLOSE,self.HideMe)
+
         #self.Bind(wx.EVT_ICONIZE,self.HideMe)
         self.lock_label.Bind(wx.EVT_HYPERLINK,self.OnUnlock)
 
@@ -555,8 +571,15 @@ class MainPannel(wx.Frame):
         self.Hide()
 
 
-    def ExitMe(self):
+    def ExitMe(self,evt=None):
         #do some cleanup
+        if hasattr(self,"timer_lock"):
+            self.timer_lock.Stop()
+            self.timer_lock.Destroy()
+        if hasattr(self,"timer_clear"):
+            self.OnTimerClear(None)
+            self.timer_clear.Stop()
+            self.timer_clear.Destroy()
         if hasattr(self,"taskicon"):
             self.taskicon.RemoveIcon()
             self.taskicon.Destroy()
@@ -567,7 +590,7 @@ class MainPannel(wx.Frame):
 
         self.Destroy()
 
-    def OnTimer(self,evt):
+    def OnTimerLock(self,evt):
         if self.confDict['idle_timer']>0 and self.canlock:
             self.lock()
 
@@ -605,21 +628,39 @@ class MainPannel(wx.Frame):
         self.canlock=True
         self.unlock()
 
+    def StartClearTimer(self,upass):
+        self.timer_clear.Start(1000*10,wx.TIMER_ONE_SHOT)
+        self.last_copied_pass=upass
+
+    def OnTimerClear(self,evt):
+        if not wx.TheClipboard.IsOpened():
+            wx.TheClipboard.Open()
+            if not wx.TheClipboard.IsSupported(wx.DataFormat(wx.DF_TEXT)):
+                self.last_copied_pass=None
+                return
+            cdata = wx.TextDataObject()
+            wx.TheClipboard.GetData(cdata)
+            if cdata.GetText() == self.last_copied_pass:
+                wx.TheClipboard.Clear()
+            wx.TheClipboard.Close()
+        else:
+            self.timer_clear.Start(1000*3,wx.TIMER_ONE_SHOT)
+
+
+
+
 
 
 class MyApp(wx.App):
-    def __init__(self,d_worker_pool,e_worker_pool):
-        self.DWorkerPool=d_worker_pool
-        self.EWorkerPool=e_worker_pool
-        wx.App.__init__(self,False,"manpass.log")
 
-    def OnInit(self):
-        self.mainwin=MainPannel(None,self.DWorkerPool,self.EWorkerPool)
-        self.SetTopWindow(self.mainwin)
-        return True
+    def SetWin(self,win):
+        self.mainwin=win
 
     def OnExit(self):
-        self.mainwin.ExitMe()
+        try:
+            self.mainwin.ExitMe()
+        except:
+            pass
 
 # end of class MainPannel
 
@@ -647,13 +688,18 @@ class MyWorkerPool:
             time.sleep(0.5)
 
 
-def main():
-    Dpool=MyWorkerPool(apiclient.decryptRecordWithSingleSalt)
-    Epool=MyWorkerPool(apiclient.genRecord)
-    app=MyApp(Dpool,Epool)
-    app.MainLoop()
+
+
+
+
 
 if __name__ == "__main__":
     multiprocessing.freeze_support()
-    main()
+    Dpool=MyWorkerPool(apiclient.decryptRecordWithSingleSalt)
+    Epool=MyWorkerPool(apiclient.genRecord)
+    app=MyApp()
+    myframe=MainPannel(None,Dpool,Epool)
+    app.SetWin(myframe)
+    app.SetTopWindow(myframe)
+    app.MainLoop()
 

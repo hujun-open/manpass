@@ -16,6 +16,8 @@ func GetConfDir(uname string) string {
 	switch runtime.GOOS {
 	case "windows":
 		defDir = filepath.Join(os.Getenv("APPDATA"), "manpass", uname)
+	case "linux":
+		defDir = filepath.Join(os.Getenv("HOME"), ".manpass", uname)
 	}
 	redirectfilename := filepath.Join(defDir, "redirection.conf")
 	redir, err := ioutil.ReadFile(redirectfilename)

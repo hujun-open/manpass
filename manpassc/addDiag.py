@@ -10,6 +10,7 @@ import wx
 import gettext
 # end wxGlade
 import genPassDiag
+import newUserDiag
 
 # begin wxGlade: extracode
 # end wxGlade
@@ -33,8 +34,8 @@ class AddPassDiag(wx.Dialog):
 
         self.Bind(wx.EVT_BUTTON,self.OnGen,self.genpassb)
 
-        okb= self.bsizer.GetItem(1).GetWindow()
-        canb=self.bsizer.GetItem(2).GetWindow()
+        okb=self.bsizer.GetAffirmativeButton()
+        canb=self.bsizer.GetCancelButton()
         self.Bind(wx.EVT_BUTTON,self.OnOK,okb)
         self.Bind(wx.EVT_BUTTON,self.OnCancel,canb)
 
@@ -85,8 +86,8 @@ class AddPassDiag(wx.Dialog):
         self.upass=self.text_ctrl_upass.GetValue().strip()
         if self.uname=="" or self.upass=="" or self.meta=="":
             wx.MessageBox(_("Website/application/username/password can't be empty!"),_("Error"),0|wx.ICON_ERROR,self)
-        else:
-            evt.Skip()
+            return
+        evt.Skip()
 
 
 
