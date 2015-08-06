@@ -1,0 +1,6 @@
+rm -rf build
+rm -rf dist
+pyinstaller manpassc.py
+cp manpassc.ico ./dist/manpassc/
+cp ../manpassd/manpassd ./dist/manpassc/
+
