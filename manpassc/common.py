@@ -27,7 +27,7 @@ import json
 import wx.lib.newevent
 import M2Crypto
 import passcrypto
-
+import socket
 
 (ManpassErrEVT, EVT_MANPASS_ERR) = wx.lib.newevent.NewEvent()
 (ManpassFatalErrEVT, EVT_MANPASS_FATALERR) = wx.lib.newevent.NewEvent()
@@ -173,6 +173,17 @@ def reEncryptCertFiles(confpath,oldpass,newpass):
     caf=open(os.path.join(confpath,"ca.cert"),"w")
     caf.write(passcrypto.EncryptMeBase32(clearca,newpass))
     caf.close()
+
+
+def checkTCPPort(address, port):
+    s=socket.socket()
+    try:
+        s.connect((address,port))
+        s.close()
+        return True
+    except socket.error,e:
+        s.close()
+        return False
 
 
 

@@ -57,7 +57,7 @@ class UnlockDiag(wx.Dialog):
 
 if __name__ == "__main__":
     app = wx.App()
-    diag=UnlockDiag(None,"hujun")
+    diag=UnlockDiag(None,"testuser")
     app.SetTopWindow(diag)
     diag.ShowModal()
     app.MainLoop()

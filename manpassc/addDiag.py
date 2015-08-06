@@ -64,7 +64,7 @@ class AddPassDiag(wx.Dialog):
         sizer_h0.Add(self.text_ctrl_upass,0,wx.RIGHT|wx.TOP,5)
         sizer_h0.Add(self.genpassb,0,wx.ALIGN_TOP|wx.TOP,3)
         sizer_v.Add(sizer_h0)
-        sizer_all.Add(sizer_v,0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
+        sizer_all.Add(sizer_v,0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 10)
         self.bsizer=self.CreateButtonSizer(wx.OK|wx.CANCEL)
         sizer_all.Add(self.bsizer,0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
         self.SetSizer(sizer_all)
@@ -74,7 +74,9 @@ class AddPassDiag(wx.Dialog):
 
 
     def OnGen(self,evt):
-        if self.genpassdiag.ShowModal()==wx.ID_OK:
+        self.genpassdiag.Centre()
+        r=self.genpassdiag.ShowModal()
+        if r==wx.ID_OK:
             self.text_ctrl_upass.SetValue(self.genpassdiag.passwd)
 
     def OnCancel(self,evt):

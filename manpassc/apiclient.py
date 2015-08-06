@@ -222,7 +222,7 @@ class APIClient:
         except Exception as Err:
             traceback.print_exc(Err)
             if win!=None:
-                eevt=common.ManpassFatalErrEVT(Value=_("Unable to get reconds!\n")+unicode(Err))
+                eevt=common.ManpassFatalErrEVT(Value=_("Unable to get records!\n")+unicode(Err))
                 wx.PostEvent(win,eevt)
                 return []
             else:
@@ -270,7 +270,7 @@ class APIClient:
         except Exception as Err:
             traceback.print_exc(Err)
             if win!=None:
-                eevt=common.ManpassFatalErrEVT(Value=_("Unable to get reconds!\n")+unicode(Err))
+                eevt=common.ManpassFatalErrEVT(Value=_("Unable to get records!\n")+unicode(Err))
                 wx.PostEvent(win,eevt)
                 return []
             else:

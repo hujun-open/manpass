@@ -1,6 +1,6 @@
 rm -rf build
 rm -rf dist
+go build ../manpassd/manpassd.go
 pyinstaller manpassc.py
 cp manpassc.ico ./dist/manpassc/
-cp ../manpassd/manpassd ./dist/manpassc/
-
+cp manpassd ./dist/manpassc/

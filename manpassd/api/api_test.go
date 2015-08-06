@@ -9,7 +9,7 @@ import (
 
 func TestSvr(t *testing.T) {
 	dbfile := "d:\\temp\\1.db"
-	tablename := "hujun"
+	tablename := "testuser"
 	t.Log("start to test InitDB\n")
 	passdb, err := passsql.InitDB(dbfile)
 	if err != nil {
@@ -18,7 +18,7 @@ func TestSvr(t *testing.T) {
 	}
 	t.Log("start to test IniTable\n")
 	passdb.InitTable(tablename)
-	svr, err := NewClientAPISVR("127.0.0.1", 9000, "hujun", []byte("zifan123"), *passdb, tablename)
+	svr, err := NewClientAPISVR("127.0.0.1", 9000, "testuser", []byte("user123"), *passdb, tablename)
 	if err != nil {
 		t.Fatal(err)
 	}

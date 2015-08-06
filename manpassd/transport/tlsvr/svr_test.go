@@ -11,7 +11,7 @@ import (
 //}
 
 func TestSvr(t *testing.T) {
-	svr, err := GetServer("0.0.0.0", 9000, "hujun", []byte("zifan123"))
+	svr, err := GetServer("0.0.0.0", 9000, "testuser", []byte("user123"))
 	if err != nil {
 		t.Fatal(err)
 		t.Fatal("failed to create server")

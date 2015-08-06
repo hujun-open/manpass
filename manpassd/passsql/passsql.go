@@ -55,6 +55,26 @@ type PassRecord struct {
 	Pass_time time.Time
 }
 
+func CheckDB(filename string) error {
+	fi, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return err
+	}
+	if fi.Size() == 0 {
+		return fmt.Errorf("Invalid DB file, size is 0")
+	}
+	db, err := sql.Open("sqlite3", filename)
+	if err != nil {
+		return err
+	}
+	_, err = db.Query("select * from sqlite_master where type='table'")
+	db.Close()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func InitDB(filename string) (*PassDB, error) {
 	//remove exising file and create a sqlite3 file
 	os.Remove(filename)
@@ -69,6 +89,10 @@ func InitDB(filename string) (*PassDB, error) {
 
 func LoadDB(filename string) (*PassDB, error) {
 	//load an existing sqlite3 file
+	err := CheckDB(filename)
+	if err != nil {
+		return nil, err
+	}
 	db, err := sql.Open("sqlite3", filename)
 	if err != nil {
 		return nil, err

@@ -26,7 +26,8 @@ import subprocess
 import threading
 import multiprocessing
 import traceback
-
+import Queue
+import newUserDiag
 # begin wxGlade: extracode
 # end wxGlade
 _ = wx.GetTranslation
@@ -373,28 +374,75 @@ class MainPannel(wx.Frame):
 
         defconflist=[
         (_("Basic Options"),
-                [(("addr"),{"desc":_("listening address"),"value":"127.0.0.1","type":"string"}),
-                 (("port"),{"desc":_("listening port"),"value":9000,"type":"int"}),
-                 (("idle_timer"),{"desc":_("idle lock timer(seconds)"),"value":60,"type":"int"}),
+                [(("addr"),{"desc":_("Listening address"),"value":"127.0.0.1","type":"string"}),
+                 (("port"),{"desc":_("Listening port"),"value":9000,"type":"int"}),
+                 (("idle_timer"),{"desc":_("Idle lock timer(seconds)"),"value":60,"type":"int"}),
                     ]
             ),
         ]
         self.OptionDiag=myoptions.OptionDiag(self,"manpass.conf",defconflist,self.uname)
         self.confDict=None
         self.confDict=self.OptionDiag.toDict()
-        cmd=common.getManpassdExeName()
-        exename=cmd
+        if not common.checkTCPPort(self.confDict['addr'],self.confDict['port']):
+            waitbox=wx.BusyInfo(_("Starting server, please wait..."))
+            cmd=common.getManpassdExeName()
+            exename=cmd
+            cmd+=" -username={uname} -pipepass=true -svrip={ip} -svrport={port}".format(uname=self.uname,ip=self.confDict['addr'],port=self.confDict['port'])
+            args=shlex.split(cmd)
+            if platform.system()=="Windows":
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags|= subprocess.STARTF_USESHOWWINDOW
+            else:
+                startupinfo = None
+            p=subprocess.Popen(args,executable=exename, stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,shell=False,startupinfo=startupinfo)
+            def enqueue_output(out, queue):
+                for line in iter(out.readline, b''):
+                    queue.put(line)
+                out.close()
+            errq=Queue.Queue()
+            t2=newUserDiag.EnQThread(p.stderr,errq)
+            t2.daemon=True
+            t2.start()
+            p.stdin.write(self.upass+"\n")
+            p.stdin.close()
+            ferror=False
+            ferror_msg=""
+            def check_output(errq):
+                t0=time.time()
+                ferror=False
+                while True:
+                    wx.GetApp().Yield()
+                    try:
+                        errline=errq.get_nowait()
+                    except Queue.Empty:
+                        if time.time()-t0>30.0:
+                            ferror=True
+                            ferror_msg="Time out"
+                            break
+                        pass
+                    else:
+                        if errline.find("Server started")!=-1:
+                            break
+                        if errline.find("Fatal Error")!=-1:
+                            ferror=True
+                            ferror_msg=errline
+                            break
+                        if (time.time()-t0)>30.0:
+                            ferror=True
+                            ferror_msg="Time out"
+                            break
+                t2.stop()
+                if ferror:
+                    wx.MessageBox(_("Server failed to start!\n")+unicode(ferror_msg),_("Error"),0|wx.ICON_ERROR,self)
+                    return
+                else:
+                    return True
 
-        cmd+=" -username={uname} -pipepass=true -svrip={ip} -svrport={port}".format(uname=self.uname,ip=self.confDict['addr'],port=self.confDict['port'])
-        args=shlex.split(cmd)
-        if platform.system()=="Windows":
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags|= subprocess.STARTF_USESHOWWINDOW
-        else:
-            startupinfo = None
-        p=subprocess.Popen(args,executable=exename, stdin=subprocess.PIPE,shell=False,startupinfo=startupinfo)
-        p.stdin.write(self.upass+"\n")
-        p.stdin.close()
+            if not check_output(errq):
+                self.ExitMe()
+                return
+
+            del waitbox
 
         try:
             cadata=apiclient.loadCAFile(self.uname,self.upass,self.confDict['confDir'])

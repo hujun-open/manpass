@@ -37,11 +37,12 @@ class GenPassDiag(wx.Dialog):
 
         self.__set_properties()
         self.__do_layout()
-        self.Centre()
+
         okb=self.bsizer.GetAffirmativeButton()
         canb=self.bsizer.GetCancelButton()
         self.Bind(wx.EVT_BUTTON,self.OnOK,okb)
         self.Bind(wx.EVT_BUTTON,self.OnCancel,canb)
+        self.Centre()
 
         # end wxGlade
 
@@ -55,6 +56,7 @@ class GenPassDiag(wx.Dialog):
         # begin wxGlade: MainPannel.__do_layout
         sizer_v = wx.BoxSizer(wx.VERTICAL)
         sizer_v.Add(self.grid, 0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL|wx.EXPAND, 5)
+        #self.bsizer=common.CreateBSizer(self)
         self.bsizer=self.CreateButtonSizer(wx.OK|wx.CANCEL)
         sizer_v.Add(self.bsizer, 0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
         self.SetSizer(sizer_v)
@@ -70,13 +72,13 @@ class GenPassDiag(wx.Dialog):
                                    self.grid.GetPropertyValue("punction"),
                                    self.grid.GetPropertyValue("custom"),
             )
-        self.Hide()
         evt.Skip()
+
 
 
     def OnCancel(self,evt):
-        self.Hide()
         evt.Skip()
+
 
 
 # end of class MainPannel

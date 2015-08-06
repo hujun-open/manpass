@@ -89,18 +89,19 @@ func main() {
 	dbfile := filepath.Join(confDir, *uname+".db")
 	passdb, err := passsql.LoadDB(dbfile)
 	if err != nil {
-		log.Fatalf("Failed to load db %s, %s", dbfile, err)
+		log.Fatalf("Fatal Error: Failed to load db %s, %s", dbfile, err)
 	}
 	svr, err := api.NewClientAPISVR(*svr_ip, *svr_port, *uname, upass, *passdb, *uname)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Fatal Error: " + string(err.Error()))
 	}
 	err = tlsvr.ListenWithConfig(svr.HttpSvr)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Fatal Error: " + string(err.Error()))
 	}
 	//	httpsvr, err := api.NewProvisionSVR(*svr_ip, *svr_port+1, *uname, upass)
 	//	httpsvr.Serve()
+	log.Println("Server started.")
 	var c chan int
 	<-c
 }

@@ -8,7 +8,7 @@ import (
 
 func TestSql(t *testing.T) {
 	dbfile := "d:\\temp\\1.db"
-	tablename := "hujun"
+	tablename := "testuser"
 	t.Log("start to test InitDB\n")
 	passdb, err := InitDB(dbfile)
 	if err != nil {

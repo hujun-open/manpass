@@ -21,7 +21,7 @@ func GetServer(ipaddr string, port int, uname string, upass []byte) (svr http.Se
 	if err != nil {
 		return svr, err
 	}
-	config.ServerName = "agent-1.hj.com"
+	//config.ServerName = "agent-1.hj.com"
 	svr.Addr = ipaddr + ":" + strconv.Itoa(port)
 	svr.TLSConfig = config
 

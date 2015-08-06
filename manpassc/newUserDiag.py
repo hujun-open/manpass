@@ -183,6 +183,7 @@ class NewUserDiag(wx.Dialog):
             b.SetLabel(orig_label)
             self.enableMe()
             return
+        waitbox=wx.BusyInfo(_("Creating new user, please wait..."))
         uport=common.getNewPort()
         exename=common.getManpassdExeName()
         cmd=exename+" -username={uname} -create=true -pipepass=true -svrport={port}".format(uname=self.uname,port=uport)
@@ -192,9 +193,8 @@ class NewUserDiag(wx.Dialog):
             startupinfo.dwFlags|= subprocess.STARTF_USESHOWWINDOW
         else:
             startupinfo = None
-        p=subprocess.Popen(args,executable=exename,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,startupinfo=startupinfo)
-
         ON_POSIX = 'posix' in sys.builtin_module_names
+        p=subprocess.Popen(args,executable=exename,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,startupinfo=startupinfo,close_fds=ON_POSIX)
         def enqueue_output(out, queue):
             for line in iter(out.readline, b''):
                 queue.put(line)
@@ -210,6 +210,7 @@ class NewUserDiag(wx.Dialog):
         p.stdin.write(pass1+"\n")
         p.stdin.close()
         def check_output(outq,errq):
+            wx.GetApp().Yield()
             while True:
                 try:
                     outline=outq.get_nowait()
@@ -231,12 +232,15 @@ class NewUserDiag(wx.Dialog):
             fp=open(os.path.join(confdir,"manpass.conf"),"w")
             fp.write('{"port": '+str(uport)+" }")
             fp.close()
-            self.Close()
-            evt.Skip()
 
-        t3=threading.Thread(target=check_output,args=(outq,errq))
-        t3.daemon=True
-        t3.start()
+
+        check_output(outq,errq)
+        del waitbox
+        self.Close()
+        evt.Skip()
+##        t3=threading.Thread(target=check_output,args=(outq,errq))
+##        t3.daemon=True
+##        t3.start()
 
 
 

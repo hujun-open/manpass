@@ -162,7 +162,7 @@ if __name__ == "__main__":
                 ]
         ),
     ]
-    diag=OptionDiag(None,"none.config",testconflist,"hujun")
+    diag=OptionDiag(None,"none.config",testconflist,"testuser")
     app.SetTopWindow(diag)
     diag.ShowModal()
     app.MainLoop()
