@@ -1,4 +1,5 @@
 import pyscrypt
+import nacl
 import nacl.secret
 import nacl.utils
 import nacl.encoding

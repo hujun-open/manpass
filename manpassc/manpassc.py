@@ -741,13 +741,15 @@ class MyWorkerPool:
 
 
 
+
 if __name__ == "__main__":
     multiprocessing.freeze_support()
     Dpool=MyWorkerPool(apiclient.decryptRecordWithSingleSalt)
     Epool=MyWorkerPool(apiclient.genRecord)
-    app=MyApp()
+    app=MyApp(False,"log.txt")
     myframe=MainPannel(None,Dpool,Epool)
     app.SetWin(myframe)
     app.SetTopWindow(myframe)
     app.MainLoop()
+
 

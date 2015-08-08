@@ -1,7 +1,11 @@
 rd /q /s build
 rd /q /s dist
 rd /q /s output
-pyinstaller manpassc.spec
-xcopy /Y /E /I C:\Python27\Lib\site-packages\PyNaCl-0.3.0-py2.7-win32.egg\nacl .\dist\manpassc\nacl
+cd ..\manpassd
+go build manpassd.go
+cd ..\manpassc
+xcopy /y ..\manpassd\manpassd.exe .
+pyinstaller --onedir --additional-hooks-dir=C:\Python27\Lib\site-packages\PyInstaller\hooks\ --hidden-import=nacl --hidden-import=cffi --noupx -w -i manpassc.ico manpassc.py
 copy /Y manpassc.ico .\dist\manpassc\
-copy /Y D:\hujun\manpass\src\manpassd\manpassd.exe .\dist\manpassc
+copy /Y manpassd.exe .\dist\manpassc\
+copy /Y msvcr120.dll .\dist\manpassc\

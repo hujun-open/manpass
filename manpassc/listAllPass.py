@@ -95,6 +95,7 @@ class ListAllPassDiag(wx.Dialog):
             wx.TheClipboard.Open()
             wx.TheClipboard.SetData(cdata)
             wx.TheClipboard.Close()
+            self.GetParent().GetParent().StartClearTimer(self.plist[i]["Pass"])
             dlg = wx.MessageDialog(self, _('Password Copied to Clipboard'),
                            _('Done'),
                            wx.OK | wx.ICON_INFORMATION

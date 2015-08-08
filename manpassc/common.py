@@ -62,7 +62,11 @@ def getManpassdExeName():
 def getNewPort():
     portList=[]
     maxport=8000
-    userlist=getAllImmediateDir(getRootConfDir())
+    rootconfdir=getRootConfDir()
+    if os.path.isdir(rootconfdir):
+        userlist=getAllImmediateDir(getRootConfDir())
+    else:
+        userlist=[]
     for user in userlist:
         uconf=getUserConf(user)
         if "port" in uconf:
