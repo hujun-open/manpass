@@ -4,9 +4,9 @@ block_cipher = None
 
 
 a = Analysis(['manpassc.py'],
-             pathex=['D:\\hujun\\Dropbox\\manpass\\src\\manpassc'],
-             hiddenimports=['nacl', 'cffi'],
-             hookspath=['C:\\Python27\\Lib\\site-packages\\PyInstaller\\hooks\\'],
+             pathex=['/Users/hujun/Dropbox/manpass/src/manpassc'],
+             hiddenimports=['M2Crypto', 'nacl', 'cffi'],
+             hookspath=['/usr/local/lib/python2.7/site-packages/PyInstaller/hooks'],
              runtime_hooks=None,
              excludes=None,
              cipher=block_cipher)
@@ -15,8 +15,8 @@ pyz = PYZ(a.pure,
 exe = EXE(pyz,
           a.scripts,
           exclude_binaries=True,
-          name='manpassc.exe',
-          debug=False,
+          name='manpassc',
+          debug=True,
           strip=None,
           upx=False,
           console=False , icon='manpassc.ico')
@@ -27,3 +27,7 @@ coll = COLLECT(exe,
                strip=None,
                upx=False,
                name='manpassc')
+app = BUNDLE(coll,
+             name='manpassc.app',
+             icon='manpassc.ico',
+             bundle_identifier=None)

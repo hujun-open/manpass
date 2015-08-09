@@ -43,7 +43,7 @@ def getRootConfDir():
     myos=platform.system()
     if myos=="Windows":
         return os.path.join(os.environ["APPDATA"],"manpass")
-    if myos=="Linux":
+    if myos=="Linux" or myos=="Darwin":
         cdir=os.path.join(os.environ["HOME"],".manpass")
         if not os.path.isdir(cdir):
             os.mkdir(cdir,0700)
@@ -55,7 +55,7 @@ def getManpassdExeName():
     myos=platform.system()
     if myos=="Windows":
         return os.path.join(cur_file_dir(),"manpassd.exe")
-    if myos=="Linux":
+    if myos=="Linux" or myos=="Darwin":
         return os.path.join(cur_file_dir(),"manpassd")
 
 

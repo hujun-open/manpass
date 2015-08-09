@@ -749,7 +749,7 @@ if __name__ == "__main__":
     app=MyApp(False,"log.txt")
     myframe=MainPannel(None,Dpool,Epool)
     app.SetWin(myframe)
-    app.SetTopWindow(myframe)
+    #app.SetTopWindow(myframe)
     app.MainLoop()
 
 

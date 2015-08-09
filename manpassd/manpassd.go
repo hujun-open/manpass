@@ -32,6 +32,7 @@ func main() {
 	}
 
 	confDir := common.GetConfDir(*uname)
+
 	fi, err := os.Stat(confDir)
 	var upass []byte
 	if (err != nil || !fi.IsDir()) && *createuser {
@@ -50,6 +51,7 @@ func main() {
 		}
 		os.Remove(confDir)
 		fmt.Println("creating needed files...\n")
+
 		err = os.MkdirAll(confDir, 0700)
 		if err != nil {
 			log.Fatalf("Failed to create directory:%s\n", confDir)

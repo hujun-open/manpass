@@ -84,9 +84,9 @@ class NewUserDiag(wx.Dialog):
         wx.Dialog.__init__(self,parent,style=style)
         self.text_ctrl_uname = wx.TextCtrl(self, wx.ID_ANY, "",size=(200,-1))
         self.label_uname = wx.StaticText(self, wx.ID_ANY,label=_("Username:"),style=wx.ALIGN_LEFT)
-        self.text_ctrl_upass1 = wx.TextCtrl(self, wx.ID_ANY, "",size=(200,-1),style=wx.TE_PASSWORD)
+        self.text_ctrl_upass1 = wx.TextCtrl(self, wx.NewId(), "",size=(200,-1),style=wx.TE_PASSWORD)
         self.label_upass1 = wx.StaticText(self, wx.ID_ANY,label=_("Password:"),style=wx.ALIGN_RIGHT)
-        self.text_ctrl_upass2 = wx.TextCtrl(self, wx.ID_ANY, "",size=(200,-1),style=wx.TE_PASSWORD)
+        self.text_ctrl_upass2 = wx.TextCtrl(self, wx.NewId(), "",size=(200,-1),style=wx.TE_PASSWORD)
         self.label_upass2 = wx.StaticText(self, wx.ID_ANY,label=_("Type Again:"),style=wx.ALIGN_RIGHT)
 
         self.__set_properties()
@@ -150,12 +150,13 @@ class NewUserDiag(wx.Dialog):
         evt.Skip()
 
     def OnOK(self,evt):
+        pass1=self.text_ctrl_upass1.GetValue().strip()
+        pass2=self.text_ctrl_upass2.GetValue().strip()
+        self.uname=self.text_ctrl_uname.GetValue().strip()
         b=evt.GetEventObject()
         orig_label=b.GetLabel()
         b.SetLabel(_("Creating..."))
         self.disableMe()
-        self.Update()
-        self.uname=self.text_ctrl_uname.GetValue().strip()
         confdir=common.getConfDir(self.uname)
         if os.path.isdir(confdir):
             wx.MessageBox(_("User already exisits, choose a different username"),_("Error"),0|wx.ICON_ERROR,self)
@@ -169,8 +170,6 @@ class NewUserDiag(wx.Dialog):
             b.SetLabel(orig_label)
             self.enableMe()
             return
-        pass1=self.text_ctrl_upass1.GetValue().strip()
-        pass2=self.text_ctrl_upass2.GetValue().strip()
         if pass1!=pass2:
             wx.MessageBox(_("Password of two typing doesn't match!"),_("Error"),0|wx.ICON_ERROR,self)
             b.SetLabel(orig_label)
@@ -210,8 +209,8 @@ class NewUserDiag(wx.Dialog):
         p.stdin.write(pass1+"\n")
         p.stdin.close()
         def check_output(outq,errq):
-            wx.GetApp().Yield()
             while True:
+                wx.GetApp().Yield()
                 try:
                     outline=outq.get_nowait()
                 except Queue.Empty:
