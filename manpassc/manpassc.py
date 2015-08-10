@@ -480,7 +480,7 @@ class MainPannel(wx.Frame):
 
         self.SetTitle("Manpass - "+self.uname.decode("utf-8"))
 
-        if platform.system()=="Windows" or platform.system()=="Darwin":
+        if platform.system()=="Windows":
             self.taskicon=MyTaskbarIcon(self)
             self.taskicon.SetIcon(self.icon)
             wx.EVT_TASKBAR_LEFT_UP(self.taskicon,self.OnDClickTaskIcon)
