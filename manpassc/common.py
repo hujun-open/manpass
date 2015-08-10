@@ -193,4 +193,4 @@ def checkTCPPort(address, port):
 
 
 if __name__ == '__main__':
-    print getNewPort()
+    print checkTCPPort("127.0.0.1",8030)

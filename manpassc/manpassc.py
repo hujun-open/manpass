@@ -346,9 +346,30 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
         self.GetParent().lock()
 
 
+class MyTaskbarIcon(wx.TaskBarIcon):
+    def __init__(self,frame):
+        wx.TaskBarIcon.__init__(self)
+        self.frame=frame
+        self.MENU_RESTORE=wx.NewId()
+        self.MENU_QUIT=wx.NewId()
+        self.Bind(wx.EVT_MENU,self.OnRestore,id=self.MENU_RESTORE)
+        self.Bind(wx.EVT_MENU,self.OnQuit,id=self.MENU_QUIT)
+
+    def CreatePopupMenu(self):
+        menu = wx.Menu()
+        menu.Append(self.MENU_RESTORE, _("Bring up Manpass window"))
+        menu.Append(self.MENU_QUIT,_("Quit Manpass"))
+        return menu
+
+    def OnRestore(self,evt):
+        self.frame.Show(True)
+        self.frame.Raise()
+
+    def OnQuit(self,evt):
+        self.frame.ExitMe(None)
 
 class MainPannel(wx.Frame):
-    def __init__(self, parent,dpool,epool):
+    def __init__(self, parent,uname,upass,dpool,epool):
         # begin wxGlade: MainPannel.__init__
         self.version=1.0
         self.canlock=True
@@ -356,17 +377,12 @@ class MainPannel(wx.Frame):
         wx.Frame.__init__(self,parent,size=(1000,1000))
         self.DWorkerPool=dpool
         self.EWrokerPool=epool
+        self.uname=uname
+        self.upass=upass
         self.icon=wx.Icon(os.path.join(common.cur_file_dir(),"manpassc.ico"),wx.BITMAP_TYPE_ICO)
         self.SetIcon(self.icon)
-        diag=loginDiag.LoginDiag(self)
-        diag.CentreOnScreen()
-        if diag.ShowModal()!=wx.ID_OK:
-            self.Hide()
-            self.ExitMe()
-            return
+
         #username, password must be encoded into utf-8 string before they could be used by crypto functions
-        self.uname=diag.text_ctrl_uname.GetValue().strip().encode('utf-8')
-        self.upass=diag.text_ctrl_upass.GetValue().encode('utf-8')
         self.lock_label=wx.HyperlinkCtrl(self,wx.ID_ANY,_("Unlock Me"),style=wx.HL_ALIGN_CENTRE)
         self.progress_bar=wx.Gauge(self,wx.ID_ANY)
         self.status_bar=wx.StatusBar(self,wx.ID_ANY)
@@ -377,6 +393,7 @@ class MainPannel(wx.Frame):
                 [(("addr"),{"desc":_("Listening address"),"value":"127.0.0.1","type":"string"}),
                  (("port"),{"desc":_("Listening port"),"value":9000,"type":"int"}),
                  (("idle_timer"),{"desc":_("Idle lock timer(seconds)"),"value":60,"type":"int"}),
+                 (("startup_minimize"),{"desc":_("Minimize the window upon startup)"),"value":False,"type":"bool"}),
                     ]
             ),
         ]
@@ -384,7 +401,7 @@ class MainPannel(wx.Frame):
         self.confDict=None
         self.confDict=self.OptionDiag.toDict()
         if not common.checkTCPPort(self.confDict['addr'],self.confDict['port']):
-            waitbox=wx.BusyInfo(_("Starting server, please wait..."))
+            waitbox=wx.BusyInfo(_("Starting Manpass server, please wait..."))
             cmd=common.getManpassdExeName()
             exename=cmd
             cmd+=" -username={uname} -pipepass=true -svrip={ip} -svrport={port}".format(uname=self.uname,ip=self.confDict['addr'],port=self.confDict['port'])
@@ -462,13 +479,16 @@ class MainPannel(wx.Frame):
             return
 
         self.SetTitle("Manpass - "+self.uname.decode("utf-8"))
-        self.taskicon=wx.TaskBarIcon()
-        if self.taskicon.IsAvailable() and platform.system()!="Linux":
+
+        if platform.system()=="Windows" or platform.system()=="Darwin":
+            self.taskicon=MyTaskbarIcon(self)
             self.taskicon.SetIcon(self.icon)
-            wx.EVT_TASKBAR_LEFT_DCLICK(self.taskicon,self.OnDClickTaskIcon)
+            wx.EVT_TASKBAR_LEFT_UP(self.taskicon,self.OnDClickTaskIcon)
             self.Bind(wx.EVT_CLOSE,self.HideMe)
         else:
             self.Bind(wx.EVT_CLOSE,self.ExitMe)
+
+
         self.timer_lock=wx.Timer(self,wx.NewId())
         self.timer_clear=wx.Timer(self,wx.NewId())
         self.timer_lock.Start(self.confDict['idle_timer']*1000,wx.TIMER_CONTINUOUS)
@@ -507,7 +527,14 @@ class MainPannel(wx.Frame):
         self.Bind(common.EVT_MANPASS_FATALERR,self.OnFatal)
         self.Bind(common.EVT_MANPASS_PROGRESS,self.UpdateProgress)
         self.Bind(common.EVT_MANPASS_LOAD_DONE,self.LoadDone)
-        self.Show(True)
+        if self.confDict['startup_minimize']:
+            if hasattr(self,"taskicon"):
+                self.HideMe(None)
+            else:
+                self.Show(True)
+                self.Iconize(True)
+        else:
+            self.Show(True)
 
 
         # end wxGlade
@@ -612,7 +639,7 @@ class MainPannel(wx.Frame):
         wx.AboutBox(info,self)
 
     def OnDClickTaskIcon(self,evt):
-        self.Show()
+        self.Show(True)
         self.Raise()
 
     def HideMe(self,evt):
@@ -736,6 +763,17 @@ class MyWorkerPool:
             time.sleep(0.5)
 
 
+def Login():
+    diag=loginDiag.LoginDiag(None)
+    diag.CentreOnScreen()
+    if diag.ShowModal()==wx.ID_OK:
+        uname=diag.text_ctrl_uname.GetValue().strip().encode('utf-8')
+        upass=diag.text_ctrl_upass.GetValue().encode('utf-8')
+	diag.Destroy()
+        return (uname,upass)
+    else:
+	diag.Destroy()
+        return None
 
 
 
@@ -744,12 +782,14 @@ class MyWorkerPool:
 
 if __name__ == "__main__":
     multiprocessing.freeze_support()
-    Dpool=MyWorkerPool(apiclient.decryptRecordWithSingleSalt)
-    Epool=MyWorkerPool(apiclient.genRecord)
     app=MyApp(False,"log.txt")
-    myframe=MainPannel(None,Dpool,Epool)
-    app.SetWin(myframe)
-    #app.SetTopWindow(myframe)
-    app.MainLoop()
+    LI=Login()
+    if LI!=None:
+        Dpool=MyWorkerPool(apiclient.decryptRecordWithSingleSalt)
+        Epool=MyWorkerPool(apiclient.genRecord)
+        myframe=MainPannel(None,LI[0],LI[1],Dpool,Epool)
+        app.SetWin(myframe)
+        app.SetTopWindow(myframe)
+        app.MainLoop()
 
 

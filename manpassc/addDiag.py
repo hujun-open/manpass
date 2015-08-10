@@ -47,7 +47,10 @@ class AddPassDiag(wx.Dialog):
     def __set_properties(self):
         # begin wxGlade: MainPannel.__set_properties
         self.text_ctrl_meta.SetFocus()
-        self.SetTitle(_("Save new credential"))
+        if self.text_ctrl_uname.GetValue()=="":
+            self.SetTitle(_("Save new credential"))
+        else:
+            self.SetTitle(_("Change password"))
         #self.SetWindowStyle(wx.BORDER_DEFAULT)
         # end wxGlade
 

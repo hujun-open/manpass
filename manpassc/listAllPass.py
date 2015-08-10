@@ -50,7 +50,7 @@ class ListAllPassDiag(wx.Dialog):
     def __set_properties(self):
         # begin wxGlade: MainPannel.__set_properties
         self.text_ctrl_meta.SetFocus()
-        self.SetTitle(_("Save new credential"))
+        self.SetTitle(_("List all history passwords"))
         #self.SetWindowStyle(wx.BORDER_DEFAULT)
         # end wxGlade
 

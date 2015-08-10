@@ -31,7 +31,9 @@ class OptionDiag(wx.Dialog):
     # "type" is one of following: string, directory, int, float
 
         wx.Dialog.__init__(self, parent)
-        self.grid=wxpg.PropertyGrid(self,wx.ID_ANY)
+        self.grid=wxpg.PropertyGrid(self,wx.ID_ANY,style=wxpg.PG_SPLITTER_AUTO_CENTER)
+        self.grid.SetColumnProportion(0,2)
+        self.grid.SetColumnProportion(0,1)
         self.uname=uname
         self.confFName=confFile
         self.confPath=self.confFName
@@ -46,12 +48,13 @@ class OptionDiag(wx.Dialog):
         canb=self.bsizer.GetCancelButton()
         self.Bind(wx.EVT_BUTTON,self.OnOK,okb)
         self.Bind(wx.EVT_BUTTON,self.OnCancel,canb)
+        self.grid.CenterSplitter(False)
 
         # end wxGlade
 
     def __set_properties(self):
         # begin wxGlade: MainPannel.__set_properties
-        self.SetTitle(_("Generate a password"))
+        self.SetTitle(_("Options"))
         #self.SetWindowStyle(wx.BORDER_DEFAULT)
         # end wxGlade
 
@@ -110,7 +113,10 @@ class OptionDiag(wx.Dialog):
                 if conf[1]['type']=='float':
                     self.grid.Append(wxpg.FloatProperty(conf[1]['desc'],conf[0],conf[1]['value']))
                     continue
-
+                if conf[1]['type']=='bool':
+                    self.grid.Append(wxpg.BoolProperty(conf[1]['desc'],conf[0],conf[1]['value']))
+                    continue
+        self.grid.CenterSplitter(False)
 
 
     def toDict(self):
@@ -142,13 +148,12 @@ class OptionDiag(wx.Dialog):
             fp.close()
         except Exception as Err:
             wx.MessageBox(_("Failed to save configurations!\n")+unicode(Err),_("Error"),0|wx.ICON_ERROR,self)
-        self.Hide()
         evt.Skip()
 
 
     def OnCancel(self,evt):
-        self.Hide()
         evt.Skip()
+
 
 
 # end of class MainPannel
