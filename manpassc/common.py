@@ -29,11 +29,15 @@ import M2Crypto
 import passcrypto
 import socket
 
+
 (ManpassErrEVT, EVT_MANPASS_ERR) = wx.lib.newevent.NewEvent()
 (ManpassFatalErrEVT, EVT_MANPASS_FATALERR) = wx.lib.newevent.NewEvent()
 (ManpassProgressEVT, EVT_MANPASS_PROGRESS) = wx.lib.newevent.NewEvent()
 (ManpassLoadingDone, EVT_MANPASS_LOAD_DONE) = wx.lib.newevent.NewEvent()
 (ManpassProgressLabel, EVT_MANPASS_PROGRESS_LABEL) = wx.lib.newevent.NewEvent()
+
+
+
 
 def getConfDir(uname):
     return os.path.join(getRootConfDir(),uname)
@@ -106,10 +110,11 @@ def genPass(passlen=18,number=True,lowercase=True,uppercase=True,
                 punction=True,ownset=None,uname=None):
 
     myset=""
+    mypunction=string.punctuation.replace("`","") #not easy to input "`" on iOS
     if number: myset+=string.digits
     if lowercase: myset+=string.lowercase
     if uppercase: myset+=string.uppercase
-    if punction: myset+=string.punctuation
+    if punction: myset+=mypunction
     if ownset!=None: myset+=ownset
     mypass=""
     for i in range(passlen):

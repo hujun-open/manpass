@@ -8,7 +8,7 @@ Usage:
 from setuptools import setup
 
 APP = ['manpassc.py']
-DATA_FILES = ["manpassc.ico","manpassd"]
+DATA_FILES = ["manpassc.ico","manpassd","py.dat"]
 OPTIONS = {'argv_emulation': True, 'packages': 'nacl,M2Crypto'}
 
 setup(

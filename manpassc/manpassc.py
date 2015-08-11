@@ -20,6 +20,8 @@ import myoptions
 import unlockDiag
 import listAllPass
 import changeMasterPassDiag
+import selfDestroyDiag
+import selfDestroyQRDiag
 import wx.dataview
 import shlex
 import subprocess
@@ -199,6 +201,8 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
         self.pmenu=wx.Menu()
         mitem=self.pmenu.Append(wx.NewId(),_("Copy Username"))
         self.Bind(wx.EVT_MENU, self.OnCopyUname, id=mitem.GetId())
+        mitem=self.pmenu.Append(wx.NewId(),_("Show Password"))
+        self.Bind(wx.EVT_MENU, self.ShowPass, id=mitem.GetId())
         self.pmenu.AppendSeparator()
         mitem=self.pmenu.Append(wx.NewId(),_("Add ..."))
         self.Bind(wx.EVT_MENU, self.OnAdd, id=mitem.GetId())
@@ -223,6 +227,8 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
         self.Bind(wx.EVT_MENU, self.OnAbout, id=mitem.GetId())
         mitem=self.pmenu.Append(wx.NewId(),_("Exit"))
         self.Bind(wx.EVT_MENU, self.OnExit, id=mitem.GetId())
+##        mitem=self.pmenu.Append(wx.NewId(),_("Exit All"))
+##        self.Bind(wx.EVT_MENU, self.OnExitAll, id=mitem.GetId())
 
 
 
@@ -342,8 +348,20 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
     def OnExit(self,evt):
         self.GetParent().ExitMe()
 
+
     def OnLock(self,evt):
         self.GetParent().lock()
+    @PauseLockWhileBusy
+    def ShowPass(self,evt):
+        sel_item=self.GetSelection()
+        if not sel_item.IsOk():
+            wx.MessageBox(_("Select a line first!"),_("Error"),0|wx.ICON_ERROR,self)
+            return
+        i=self.GetItemData(sel_item)
+        dlg=selfDestroyQRDiag.SelfDestroyQRDiag(self,self.passlist[i]["Pass"],30)
+        dlg.ShowModal()
+        dlg.Destroy()
+
 
 
 class MyTaskbarIcon(wx.TaskBarIcon):
@@ -411,17 +429,17 @@ class MainPannel(wx.Frame):
                 startupinfo.dwFlags|= subprocess.STARTF_USESHOWWINDOW
             else:
                 startupinfo = None
-            p=subprocess.Popen(args,executable=exename, stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,shell=False,startupinfo=startupinfo)
+            self.svrp=subprocess.Popen(args,executable=exename, stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,shell=False,startupinfo=startupinfo)
             def enqueue_output(out, queue):
                 for line in iter(out.readline, b''):
                     queue.put(line)
                 out.close()
             errq=Queue.Queue()
-            t2=newUserDiag.EnQThread(p.stderr,errq)
+            t2=newUserDiag.EnQThread(self.svrp.stderr,errq)
             t2.daemon=True
             t2.start()
-            p.stdin.write(self.upass+"\n")
-            p.stdin.close()
+            self.svrp.stdin.write(self.upass+"\n")
+            self.svrp.stdin.close()
             ferror=False
             ferror_msg=""
             def check_output(errq):
@@ -704,7 +722,7 @@ class MainPannel(wx.Frame):
         self.unlock()
 
     def StartClearTimer(self,upass):
-        self.timer_clear.Start(1000*10,wx.TIMER_ONE_SHOT)
+        self.timer_clear.Start(1000*20,wx.TIMER_ONE_SHOT)
         self.last_copied_pass=upass
 
     def OnTimerClear(self,evt):

@@ -9,3 +9,4 @@ pyinstaller --onedir --additional-hooks-dir=C:\Python27\Lib\site-packages\PyInst
 copy /Y manpassc.ico .\dist\manpassc\
 copy /Y manpassd.exe .\dist\manpassc\
 copy /Y msvcr120.dll .\dist\manpassc\
+copy /Y py.dat .\dist\manpassc\
