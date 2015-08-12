@@ -172,6 +172,7 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
 
 
     def copyInfoToClip(self,i,dkey="Pass"):
+        dlg=None
         if i < len(self.passlist) and not wx.TheClipboard.IsOpened():
             cdata=wx.TextDataObject()
             cdata.SetText(self.passlist[i][dkey])
@@ -181,9 +182,10 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
             itemname=""
             if dkey=="Pass": itemname=_("Password")
             if dkey=="Uname": itemname=_("Username")
-            dlg = wx.MessageDialog(self, itemname+_(' Copied to Clipboard'),
-                           _('Done'),
-                           wx.OK | wx.ICON_INFORMATION)
+##            dlg = wx.MessageDialog(self, itemname+_(' Copied to Clipboard'),
+##                           _('Done'),
+##                           wx.OK | wx.ICON_INFORMATION)
+            self.GetParent().setStatusTxt(itemname+_(" Copied to Clipboard."))
             if dkey=="Pass":
                 self.GetParent().StartClearTimer(self.passlist[i][dkey])
 
@@ -192,9 +194,9 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
                            _('Error'),
                            wx.OK | wx.ICON_ERROR
                                                           )
-
-        dlg.ShowModal()
-        dlg.Destroy()
+        if dlg!=None:
+            dlg.ShowModal()
+            dlg.Destroy()
 
 
     def createPopMenu(self):
@@ -257,7 +259,7 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
 
     @PauseLockWhileBusy
     def OnChangePass(self,evt):
-        #create a new rev of password
+        #create a new rev of password or add a pass if meta or username changes
         sel_item=self.GetSelection()
         if not sel_item.IsOk():
             wx.MessageBox(_("Select a line first!"),_("Error"),0|wx.ICON_ERROR,self)
@@ -271,15 +273,15 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
                 wx.MessageBox(_("Unable to save credential!\n")+unicode(Err),_("Error"),0|wx.ICON_ERROR,self)
                 return
             try:
-                r=self.apc.get(self.passlist[i]['Meta'],self.passlist[i]['Uname'])
-                del self.passlist[i]
-                r["PYS"]=self.cnsort.strToPYS(r["Meta"].lower())
-                self.passlist.insert(i,r)
-                self.reloadWithoutGet()
+                r=self.apc.get(dlg.meta,dlg.uname)
             except:
                 wx.MessageBox(_("Getting latest record failed!\n")+unicode(Err),_("Error"),0|wx.ICON_ERROR,self)
                 return
-
+            r["PYS"]=self.cnsort.strToPYS(r["Meta"].lower())
+            if not dlg.new_entry:
+                    del self.passlist[i]
+            self.passlist.insert(i,r)
+            self.reloadWithoutGet()
 
 
     def OnCopyUname(self,evt):
@@ -468,15 +470,16 @@ class MainPannel(wx.Frame):
                             break
                 t2.stop()
                 if ferror:
-                    wx.MessageBox(_("Server failed to start!\n")+unicode(ferror_msg),_("Error"),0|wx.ICON_ERROR,self)
-                    return
+##                    wx.MessageBox(_("Server failed to start!\n")+unicode(ferror_msg),_("Error"),0|wx.ICON_ERROR,self)
+                    return _("Server failed to start!\n")+unicode(ferror_msg)
                 else:
                     return True
-
-            if not check_output(errq):
+            startresult=check_output(errq)
+            if startresult!=True:
+                del waitbox
+                wx.MessageBox(startresult,_("Error"),0|wx.ICON_ERROR,self)
                 self.ExitMe()
                 return
-
             del waitbox
 
         try:

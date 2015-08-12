@@ -100,6 +100,7 @@ class ListAllPassDiag(wx.Dialog):
                            _('Done'),
                            wx.OK | wx.ICON_INFORMATION
                                                           )
+            self.GetParent().GetParent().StartClearTimer(self.plist[i]["Pass"])
         else:
             dlg = wx.MessageDialog(self,_('{Password Copy Failed'),
                            _('Error'),

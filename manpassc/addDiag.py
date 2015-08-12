@@ -21,6 +21,9 @@ class AddPassDiag(wx.Dialog):
         # begin wxGlade: MainPannel.__init__
         #kwds["style"] = wx.TAB_TRAVERSAL|wx.BORDER_DEFAULT|wx.CLOSE_BOX
         wx.Dialog.__init__(self,parent)
+        self.orig_uname=uname
+        self.orig_upass=upass
+        self.orig_meta=meta
         self.text_ctrl_meta = wx.TextCtrl(self, wx.ID_ANY, meta,size=(300,-1))
         self.label_meta = wx.StaticText(self, wx.ID_ANY,label=_("Website/Application:"),style=wx.ALIGN_LEFT )
         self.text_ctrl_uname = wx.TextCtrl(self, wx.ID_ANY, uname,size=(200,-1))
@@ -86,12 +89,18 @@ class AddPassDiag(wx.Dialog):
         evt.Skip()
 
     def OnOK(self,evt):
+        self.new_entry=False
         self.uname=self.text_ctrl_uname.GetValue().strip()
         self.meta=self.text_ctrl_meta.GetValue().strip()
         self.upass=self.text_ctrl_upass.GetValue().strip()
         if self.uname=="" or self.upass=="" or self.meta=="":
             wx.MessageBox(_("Website/application/username/password can't be empty!"),_("Error"),0|wx.ICON_ERROR,self)
             return
+        if self.orig_upass==self.upass and self.orig_meta==self.meta and self.uname==self.orig_uname:
+            wx.MessageBox(_("You didn't make any changes!"),_("Error"),0|wx.ICON_ERROR,self)
+            return
+        if self.orig_meta!=self.meta or self.uname!=self.orig_uname:
+            self.new_entry=True
         evt.Skip()
 
 
