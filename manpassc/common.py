@@ -92,7 +92,7 @@ def getAllImmediateDir(rootdir):
 def getUserConf(uname):
     try:
         redirectConf=codecs.open(os.path.join(getConfDir(uname),"redirection.conf"),"r","utf-8")
-        confdir=redirectConf.read()
+        confdir=redirectConf.read().strip()
         redirectConf.close()
     except:
         confdir=getConfDir(uname)

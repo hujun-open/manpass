@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 func GetConfDir(uname string) string {
@@ -24,7 +25,8 @@ func GetConfDir(uname string) string {
 	if err != nil {
 		return defDir
 	} else {
-		return string(redir)
+		redir_str := strings.TrimRight(string(redir), " 	\n\r")
+		return redir_str
 	}
 	return ""
 }

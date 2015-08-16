@@ -1,0 +1,4 @@
+rm -rf build
+rm -rf dist
+go build ../manpassd/manpassd.go
+python setup.py py2app

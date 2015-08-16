@@ -394,7 +394,7 @@ class MainPannel(wx.Frame):
         self.version=1.0
         self.canlock=True
         self.last_copied_pass=None
-        wx.Frame.__init__(self,parent,size=(1000,1000))
+        wx.Frame.__init__(self,parent,size=(1000,1000),style=wx.TAB_TRAVERSAL|wx.DEFAULT_FRAME_STYLE|wx.WANTS_CHARS)
         self.DWorkerPool=dpool
         self.EWrokerPool=epool
         self.uname=uname
@@ -413,7 +413,8 @@ class MainPannel(wx.Frame):
                 [(("addr"),{"desc":_("Listening address"),"value":"127.0.0.1","type":"string"}),
                  (("port"),{"desc":_("Listening port"),"value":9000,"type":"int"}),
                  (("idle_timer"),{"desc":_("Idle lock timer(seconds)"),"value":60,"type":"int"}),
-                 (("startup_minimize"),{"desc":_("Minimize the window upon startup)"),"value":False,"type":"bool"}),
+                 (("startup_minimize"),{"desc":_("Minimize the window upon startup"),"value":False,"type":"bool"}),
+                 (("close&lock"),{"desc":_("Lock the window upon close(windows only)"),"value":True,"type":"bool"}),
                     ]
             ),
         ]
@@ -431,7 +432,14 @@ class MainPannel(wx.Frame):
                 startupinfo.dwFlags|= subprocess.STARTF_USESHOWWINDOW
             else:
                 startupinfo = None
-            self.svrp=subprocess.Popen(args,executable=exename, stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,shell=False,startupinfo=startupinfo)
+            try:
+                self.svrp=subprocess.Popen(args,executable=exename, stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,shell=False,startupinfo=startupinfo)
+            except Exception as Err:
+                del waitbox
+                wx.MessageBox(unicode(Err),_("Error"),0|wx.ICON_ERROR,self)
+                self.ExitMe()
+                return
+
             def enqueue_output(out, queue):
                 for line in iter(out.readline, b''):
                     queue.put(line)
@@ -505,13 +513,13 @@ class MainPannel(wx.Frame):
             self.taskicon=MyTaskbarIcon(self)
             self.taskicon.SetIcon(self.icon)
             wx.EVT_TASKBAR_LEFT_UP(self.taskicon,self.OnDClickTaskIcon)
-            self.Bind(wx.EVT_CLOSE,self.HideMe)
-        else:
-            self.Bind(wx.EVT_CLOSE,self.ExitMe)
+
+        self.Bind(wx.EVT_CLOSE,self.HideMe)
 
 
         self.timer_lock=wx.Timer(self,wx.NewId())
         self.timer_clear=wx.Timer(self,wx.NewId())
+        self.timer_statustxt=wx.Timer(self,wx.NewId())
         self.timer_lock.Start(self.confDict['idle_timer']*1000,wx.TIMER_CONTINUOUS)
         self.text_ctrl_search_input = wx.SearchCtrl(self, wx.NewId(),"")
         self.list_ctrl_1 = PassListCtrl(self,self.text_ctrl_search_input)
@@ -519,10 +527,15 @@ class MainPannel(wx.Frame):
 
         self.Bind(wx.EVT_TIMER,self.OnTimerLock,self.timer_lock)
         self.Bind(wx.EVT_TIMER,self.OnTimerClear,self.timer_clear)
+        self.Bind(wx.EVT_TIMER,self.OnTimerStatusTxt,self.timer_statustxt)
 
         self.Bind(wx.EVT_TEXT,self.OnFilter,self.text_ctrl_search_input)
         self.text_ctrl_search_input.Bind(wx.EVT_SET_FOCUS,self.OnFilterAct)
         self.text_ctrl_search_input.Bind(wx.EVT_CHAR,self.OnChar)
+
+        self.Bind(wx.EVT_CHAR,self.OnChar)
+        self.list_ctrl_1.Bind(wx.EVT_CHAR,self.OnChar)
+        self.lock_label.Bind(wx.EVT_CHAR,self.OnChar)
 ##        self.text_ctrl_search_input.Bind(wx.EVT_SET_FOCUS,self.OnFilterAct)
 
         self.__set_properties()
@@ -537,7 +550,7 @@ class MainPannel(wx.Frame):
         #self.Bind(wx.EVT_ICONIZE,self.HideMe)
         self.lock_label.Bind(wx.EVT_HYPERLINK,self.OnUnlock)
 
-        self.text_ctrl_search_input.Bind(wx.EVT_CHAR,self.resetTimer)
+        #self.text_ctrl_search_input.Bind(wx.EVT_CHAR,self.resetTimer)
 
         self.list_ctrl_1.Bind(wx.dataview.EVT_DATAVIEW_SELECTION_CHANGED,self.resetTimer)
         self.list_ctrl_1.Bind(wx.dataview.EVT_DATAVIEW_ITEM_ACTIVATED,self.resetTimer)
@@ -548,14 +561,18 @@ class MainPannel(wx.Frame):
         self.Bind(common.EVT_MANPASS_FATALERR,self.OnFatal)
         self.Bind(common.EVT_MANPASS_PROGRESS,self.UpdateProgress)
         self.Bind(common.EVT_MANPASS_LOAD_DONE,self.LoadDone)
+
+        if platform.system()=="Windows":
+            import win32con
+            self.RegisterHotKey(52445,win32con.MOD_CONTROL,ord("I"))
+            self.Bind(wx.EVT_HOTKEY, self.OnDClickTaskIcon, id=52445)
+
+
         if self.confDict['startup_minimize']:
-            if hasattr(self,"taskicon"):
-                self.HideMe(None)
-            else:
-                self.Show(True)
-                self.Iconize(True)
+            self.HideMe(None)
         else:
             self.Show(True)
+            self.Raise()
 
 
         # end wxGlade
@@ -595,6 +612,10 @@ class MainPannel(wx.Frame):
 
     def setStatusTxt(self,txt):
         self.status_bar.SetStatusText(txt)
+        self.timer_statustxt.Start(1000*3,wx.TIMER_ONE_SHOT)
+
+    def OnTimerStatusTxt(self,evt):
+        self.status_bar.SetStatusText("")
 
     def OnUnlock(self,evt):
         dlg=unlockDiag.UnlockDiag(self,self.uname)
@@ -612,6 +633,7 @@ class MainPannel(wx.Frame):
         self.text_ctrl_search_input.Show(True)
         self.Layout()
         self.timer_lock.Start(self.confDict["idle_timer"]*1000,wx.TIMER_CONTINUOUS)
+        self.text_ctrl_search_input.SetFocus()
 
     def lock(self):
         self.timer_lock.Stop()
@@ -620,6 +642,7 @@ class MainPannel(wx.Frame):
         self.lock_label.Show(True)
         self.progress_bar.Hide()
         self.Layout()
+        self.lock_label.SetFocus()
 
     def showLoading(self):
         self.timer_lock.Stop()
@@ -645,7 +668,13 @@ class MainPannel(wx.Frame):
         evt.Skip()
 
     def OnChar(self,evt):
+        self.resetTimer(None)
         if evt.GetKeyCode()==wx.WXK_ESCAPE:
+            if self.text_ctrl_search_input.GetValue()=="" or self.text_ctrl_search_input.IsShown()==False:
+                self.HideMe(None)
+                evt.Skip()
+                return
+
             self.text_ctrl_search_input.Clear()
         evt.Skip()
 
@@ -656,7 +685,7 @@ class MainPannel(wx.Frame):
         info.SetName("Manpass")
         info.SetDescription("A Secure Password Manager")
         info.SetVersion(unicode(self.version))
-        info.SetWebSite("http://TBD.com")
+        info.WebSite=("https://github.com/hujun-open/manpass","Manpass website")
         wx.AboutBox(info,self)
 
     def OnDClickTaskIcon(self,evt):
@@ -664,7 +693,12 @@ class MainPannel(wx.Frame):
         self.Raise()
 
     def HideMe(self,evt):
-        self.Hide()
+        if platform.system()=="Windows":
+            self.Hide()
+        else:
+            self.Iconize(True)
+        if self.confDict['close&lock']:
+            self.lock()
 
 
     def ExitMe(self,evt=None):

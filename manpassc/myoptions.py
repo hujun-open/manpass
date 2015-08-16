@@ -76,7 +76,7 @@ class OptionDiag(wx.Dialog):
         #if it doesn't exist, then system will load main config from default dir
         try:
             redirectConf=codecs.open(os.path.join(common.getConfDir(self.uname),"redirection.conf"),"r","utf-8")
-            confdir=redirectConf.read()
+            confdir=redirectConf.read().strip()
             redirectConf.close()
         except:
             confdir=common.getConfDir(self.uname)
