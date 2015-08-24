@@ -11,19 +11,28 @@ import gettext
 # end wxGlade
 import genPassDiag
 import newUserDiag
+import common
 
 # begin wxGlade: extracode
 # end wxGlade
 _ = wx.GetTranslation
 
 class AddPassDiag(wx.Dialog):
-    def __init__(self, parent,meta="",uname="",upass=""):
+    def __init__(self, parent,meta="",uname="",upass="",remark="",kgroup="NORMAL",readonly=False):
         # begin wxGlade: MainPannel.__init__
         #kwds["style"] = wx.TAB_TRAVERSAL|wx.BORDER_DEFAULT|wx.CLOSE_BOX
         wx.Dialog.__init__(self,parent)
         self.orig_uname=uname
         self.orig_upass=upass
         self.orig_meta=meta
+        self.orig_remark=remark
+##        if readonly==False:
+##            rstyle=0
+##        else:
+##            rstyle=wx.TE_READONLY
+        self.readonly=readonly
+        self.orig_kgroup=kgroup
+        self.kgroup=self.orig_kgroup
         self.text_ctrl_meta = wx.TextCtrl(self, wx.ID_ANY, meta,size=(300,-1))
         self.label_meta = wx.StaticText(self, wx.ID_ANY,label=_("Website/Application:"),style=wx.ALIGN_LEFT )
         self.text_ctrl_uname = wx.TextCtrl(self, wx.ID_ANY, uname,size=(200,-1))
@@ -32,19 +41,35 @@ class AddPassDiag(wx.Dialog):
         self.label_upass = wx.StaticText(self, wx.ID_ANY,label=_("Password:"),style=wx.ALIGN_RIGHT)
         self.genpassb=wx.Button(self,wx.ID_ANY,_("Generate"))
         self.genpassdiag=genPassDiag.GenPassDiag(self)
+        self.text_ctrl_remark = wx.TextCtrl(self, wx.ID_ANY, remark,size=(300,-1),style=wx.TE_MULTILINE)
+        self.label_remark = wx.StaticText(self, wx.ID_ANY,label=_("Remark:"),style=wx.ALIGN_LEFT)
+        self.text_ctrl_meta.Bind(wx.EVT_CHAR,self.OnChar)
+
+
+
         self.__set_properties()
         self.__do_layout()
 
         self.Bind(wx.EVT_BUTTON,self.OnGen,self.genpassb)
 
         okb=self.bsizer.GetAffirmativeButton()
-        canb=self.bsizer.GetCancelButton()
         self.Bind(wx.EVT_BUTTON,self.OnOK,okb)
-        self.Bind(wx.EVT_BUTTON,self.OnCancel,canb)
+        if self.readonly==False:
+            canb=self.bsizer.GetCancelButton()
+            self.Bind(wx.EVT_BUTTON,self.OnCancel,canb)
 
 
         self.Centre()
         self.text_ctrl_meta.SetFocus()
+        self.HiddenMe()
+        if readonly==True:
+            self.text_ctrl_meta.SetEditable(False)
+            self.text_ctrl_remark.SetEditable(False)
+            self.text_ctrl_uname.SetEditable(False)
+            self.text_ctrl_upass.SetEditable(False)
+            self.text_ctrl_upass.Hide()
+            self.label_upass.Hide()
+
         # end wxGlade
 
     def __set_properties(self):
@@ -60,7 +85,7 @@ class AddPassDiag(wx.Dialog):
     def __do_layout(self):
         # begin wxGlade: MainPannel.__do_layout
         sizer_all=wx.BoxSizer(wx.VERTICAL)
-        sizer_v = wx.FlexGridSizer(3,2,5,5)
+        sizer_v = wx.FlexGridSizer(4,2,5,5)
         sizer_v.Add(self.label_meta,1,wx.FIXED_MINSIZE|wx.ALIGN_RIGHT|wx.ALL,0)
         sizer_v.Add(self.text_ctrl_meta,3,wx.ALL,0)
         sizer_v.Add(self.label_uname,0,wx.FIXED_MINSIZE|wx.ALIGN_RIGHT|wx.TOP,5)
@@ -68,10 +93,18 @@ class AddPassDiag(wx.Dialog):
         sizer_v.Add(self.label_upass,0,wx.FIXED_MINSIZE|wx.ALIGN_RIGHT|wx.TOP,5)
         sizer_h0=wx.BoxSizer(wx.HORIZONTAL)
         sizer_h0.Add(self.text_ctrl_upass,0,wx.RIGHT|wx.TOP,5)
-        sizer_h0.Add(self.genpassb,0,wx.ALIGN_TOP|wx.TOP,3)
+        if self.readonly==False:
+            sizer_h0.Add(self.genpassb,0,wx.ALIGN_TOP|wx.TOP,3)
+        else:
+            self.genpassb.Hide()
         sizer_v.Add(sizer_h0)
+        sizer_v.Add(self.label_remark,1,wx.FIXED_MINSIZE|wx.ALIGN_RIGHT|wx.ALL,0)
+        sizer_v.Add(self.text_ctrl_remark,3,wx.ALL,0)
         sizer_all.Add(sizer_v,0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 10)
-        self.bsizer=self.CreateButtonSizer(wx.OK|wx.CANCEL)
+        if self.readonly==False:
+            self.bsizer=self.CreateButtonSizer(wx.OK|wx.CANCEL)
+        else:
+            self.bsizer=self.CreateButtonSizer(wx.OK)
         sizer_all.Add(self.bsizer,0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
         self.SetSizer(sizer_all)
         sizer_all.Fit(self)
@@ -85,20 +118,51 @@ class AddPassDiag(wx.Dialog):
         if r==wx.ID_OK:
             self.text_ctrl_upass.SetValue(self.genpassdiag.passwd)
 
+
+    def HiddenMe(self):
+        if common.isHidden(self.kgroup):
+            self.text_ctrl_meta.SetBackgroundColour(wx.TheColourDatabase.Find("DARK GREY"))
+            self.text_ctrl_meta.SetForegroundColour(wx.TheColourDatabase.Find("WHITE"))
+        else:
+            self.text_ctrl_meta.SetBackgroundColour(wx.NullColour)
+            self.text_ctrl_meta.SetForegroundColour(wx.NullColour)
+        self.text_ctrl_meta.Refresh()
+
+
+
+    def OnChar(self,evt):
+        if evt.GetKeyCode()==wx.WXK_CONTROL_H and self.readonly==False:
+            if evt.GetModifiers() == wx.MOD_CONTROL+wx.MOD_SHIFT:
+                if common.isHidden(self.kgroup):
+                    self.kgroup=common.HideIt(self.kgroup,False)
+                else:
+                    self.kgroup=common.HideIt(self.kgroup,True)
+                self.HiddenMe()
+                return
+        evt.Skip()
+
     def OnCancel(self,evt):
         evt.Skip()
 
     def OnOK(self,evt):
+        if self.readonly:
+            evt.Skip()
+            return
         self.new_entry=False
         self.uname=self.text_ctrl_uname.GetValue().strip()
         self.meta=self.text_ctrl_meta.GetValue().strip()
         self.upass=self.text_ctrl_upass.GetValue().strip()
+        self.remark=self.text_ctrl_remark.GetValue().strip()
+        self.onlyhidden=False
         if self.uname=="" or self.upass=="" or self.meta=="":
             wx.MessageBox(_("Website/application/username/password can't be empty!"),_("Error"),0|wx.ICON_ERROR,self)
             return
-        if self.orig_upass==self.upass and self.orig_meta==self.meta and self.uname==self.orig_uname:
-            wx.MessageBox(_("You didn't make any changes!"),_("Error"),0|wx.ICON_ERROR,self)
-            return
+        if self.orig_upass==self.upass and self.orig_meta==self.meta and self.uname==self.orig_uname and self.remark==self.orig_remark:
+            if self.orig_kgroup==self.kgroup:
+                wx.MessageBox(_("You didn't make any changes!"),_("Error"),0|wx.ICON_ERROR,self)
+                return
+            else:
+                self.onlyhidden=True
         if self.orig_meta!=self.meta or self.uname!=self.orig_uname:
             self.new_entry=True
         evt.Skip()
@@ -109,7 +173,7 @@ class AddPassDiag(wx.Dialog):
 
 if __name__ == "__main__":
     app = wx.App()
-    diag=AddPassDiag(None)
+    diag=AddPassDiag(None,"metahaha",kgroup="NORMAL",readonly=True)
     app.SetTopWindow(diag)
     diag.ShowModal()
     app.MainLoop()

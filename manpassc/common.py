@@ -63,7 +63,7 @@ def getManpassdExeName():
         return os.path.join(cur_file_dir(),"manpassd")
 
 
-def getNewPort():
+def getNewPort(laddr=None):
     portList=[]
     maxport=8000
     rootconfdir=getRootConfDir()
@@ -77,9 +77,15 @@ def getNewPort():
             if uconf['port']>maxport:
                 maxport=uconf['port']
     if maxport<=65534:
-        return maxport+10
+        rport=maxport+10
     else:
-        return 8000
+        rport= 8000
+    laddr="127.0.0.1"
+    while checkTCPPort(laddr,rport):
+        rport+=1
+        if rport==65534:
+            return False
+    return rport
 
 def getAllImmediateDir(rootdir):
     rlist=[]
@@ -87,6 +93,15 @@ def getAllImmediateDir(rootdir):
         if os.path.isdir(os.path.join(rootdir,d)):
             rlist.append(d)
     return rlist
+
+def isHidden(kgroup):
+    return kgroup[0:2]=="-1"
+
+def HideIt(kgroup,hide=True):
+    if hide:
+        return kgroup+"-1"
+    else:
+        return kgroup[2:]
 
 
 def getUserConf(uname):

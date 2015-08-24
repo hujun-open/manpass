@@ -10,8 +10,8 @@ import common
 # begin wxGlade: dependencies
 import gettext
 # end wxGlade
-import genPassDiag
 import threading
+import addDiag
 
 # begin wxGlade: extracode
 # end wxGlade
@@ -30,8 +30,9 @@ class ListAllPassDiag(wx.Dialog):
         self.label_uname = wx.StaticText(self, wx.ID_ANY,label=_("Username:"),style=wx.ALIGN_LEFT)
         self.choice_upass = wx.Choice(self, wx.ID_ANY,size=(175,-1))
         self.label_upass = wx.StaticText(self, wx.ID_ANY,label=_("Password:"),style=wx.ALIGN_RIGHT)
-        self.copypassb=wx.Button(self,wx.ID_ANY,_("Copy Password"))
-        self.delpassb=wx.Button(self,wx.ID_ANY,_("Delete Password"))
+        self.copypassb=wx.Button(self,wx.NewId(),_("Copy Password"))
+        self.delpassb=wx.Button(self,wx.NewId(),_("Delete Password"))
+        self.showpassb=wx.Button(self,wx.NewId(),_("Show Credential"))
         self.apc=apc
         self.plist=None
         self.reload()
@@ -41,6 +42,7 @@ class ListAllPassDiag(wx.Dialog):
 
         self.Bind(wx.EVT_BUTTON,self.OnCopy,self.copypassb)
         self.Bind(wx.EVT_BUTTON,self.OnDel,self.delpassb)
+        self.Bind(wx.EVT_BUTTON,self.OnShow,self.showpassb)
         self.Bind(common.EVT_MANPASS_LOAD_DONE,self.loadDone)
         self.Bind(common.EVT_MANPASS_ERR,self.OnErr)
 
@@ -67,6 +69,7 @@ class ListAllPassDiag(wx.Dialog):
         sizer_h0.Add(self.choice_upass,0,wx.RIGHT|wx.TOP,5)
         sizer_h0.Add(self.copypassb,0,wx.ALIGN_TOP|wx.TOP,3)
         sizer_h0.Add(self.delpassb,0,wx.ALIGN_TOP|wx.TOP,3)
+        sizer_h0.Add(self.showpassb,0,wx.ALIGN_TOP|wx.TOP,3)
         sizer_grid.Add(sizer_h0)
         sizer_all.Add(sizer_grid,0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
         self.bsizer=self.CreateButtonSizer(wx.OK|wx.CANCEL)
@@ -120,8 +123,16 @@ class ListAllPassDiag(wx.Dialog):
                 return
             self.reload()
 
+    def OnShow(self,evt):
+        i=self.choice_upass.GetSelection()
+        dlg=addDiag.AddPassDiag(self,self.plist[i]['Meta'],self.plist[i]['Uname'],self.plist[i]['Pass'],self.plist[i]['Remark'],self.plist[i]['Kgroup'], readonly=True)
+        dlg.ShowModal()
+        dlg.Destroy()
+
+
     def loadDone(self,evt):
-        self.plist=evt.plist
+        #self.plist=evt.plist
+        self.plist=sorted(evt.plist,key=lambda k: k['Pass_rev'])
         self.choice_upass.Clear()
         for p in self.plist:
             self.choice_upass.Append("Rev:{rev} {date}".format(rev=p['Pass_rev'] ,date=p['Pass_time']))

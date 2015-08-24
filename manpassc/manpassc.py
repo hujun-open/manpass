@@ -104,7 +104,7 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
         wx.dataview.DataViewListCtrl.__init__(self,parent,wx.ID_ANY)
         self.AppendTextColumn(_("Website/Application"))
         self.AppendTextColumn(_("Username"))
-        self.AppendTextColumn(_("Password"),mode=wx.dataview.DATAVIEW_CELL_ACTIVATABLE)
+        #self.AppendTextColumn(_("Password"),mode=wx.dataview.DATAVIEW_CELL_ACTIVATABLE)
         self.AppendTextColumn(_("Creation time"))
         self.AppendTextColumn(_("Rev"))
         self.fctrl=filter_txtctrl
@@ -118,6 +118,7 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
         self.passlist=[]
         self.cnsort=cnsort()
         self.createPopMenu()
+
 
 
 
@@ -145,16 +146,23 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
         self.DeleteAllItems()
         if len(self.passlist)==0:
             return
+        self.passlist=sorted(self.passlist,key=lambda k: k['Meta'].lower())
         filter_key=self.fctrl.GetValue().strip()
         i=0
         for p in self.passlist:
-            data=[p['Meta'],p['Uname'],u"****",p['Pass_time'],unicode(p['Pass_rev'])]
+            data=[p['Meta'],p['Uname'],p['Pass_time'],unicode(p['Pass_rev'])]
+            if self.GetParent().listall==False and common.isHidden(p["Kgroup"]):
+                continue
             if filter_key=="" or not self.filterme:
                 self.AppendItem(data,i)
             else:
                 if p['PYS'].find(filter_key) !=-1:
                     self.AppendItem(data,i)
             i+=1
+        col=self.GetColumn(0)
+        col.SetWidth(wx.COL_WIDTH_AUTOSIZE)
+        col=self.GetColumn(1)
+        col.SetWidth(wx.COL_WIDTH_AUTOSIZE)
 
 
     def reload(self,filterme=True):
@@ -203,7 +211,7 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
         self.pmenu=wx.Menu()
         mitem=self.pmenu.Append(wx.NewId(),_("Copy Username"))
         self.Bind(wx.EVT_MENU, self.OnCopyUname, id=mitem.GetId())
-        mitem=self.pmenu.Append(wx.NewId(),_("Show Password"))
+        mitem=self.pmenu.Append(wx.NewId(),_("Show Password as QR code"))
         self.Bind(wx.EVT_MENU, self.ShowPass, id=mitem.GetId())
         self.pmenu.AppendSeparator()
         mitem=self.pmenu.Append(wx.NewId(),_("Add ..."))
@@ -215,6 +223,9 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
         self.Bind(wx.EVT_MENU, self.OnChangePass, id=mitem.GetId())
         mitem=self.pmenu.Append(wx.NewId(),_("List history passwords ..."))
         self.Bind(wx.EVT_MENU, self.OnListAllPass, id=mitem.GetId())
+        mitem=self.pmenu.Append(wx.NewId(),_("Show ..."))
+        self.Bind(wx.EVT_MENU, self.OnShowCred, id=mitem.GetId())
+
         mitem=self.pmenu.Append(wx.NewId(),_("Delete"))
         self.Bind(wx.EVT_MENU, self.OnDel, id=mitem.GetId())
         self.pmenu.AppendSeparator()
@@ -250,7 +261,6 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
             try:
                 self.apc.remove(self.passlist[i]['Meta'],self.passlist[i]['Uname'])
             except Exception as Err:
-                print Err
                 wx.MessageBox(_("Unable to remove credential from DB!\n")+unicode(Err),_("Error"),0|wx.ICON_ERROR,self)
                 return
 
@@ -265,10 +275,10 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
             wx.MessageBox(_("Select a line first!"),_("Error"),0|wx.ICON_ERROR,self)
             return
         i=self.GetItemData(sel_item)
-        dlg=addDiag.AddPassDiag(self,self.passlist[i]['Meta'],self.passlist[i]['Uname'],self.passlist[i]['Pass'])
+        dlg=addDiag.AddPassDiag(self,self.passlist[i]['Meta'],self.passlist[i]['Uname'],self.passlist[i]['Pass'],self.passlist[i]['Remark'],self.passlist[i]['Kgroup'])
         if dlg.ShowModal()==wx.ID_OK:
             try:
-                self.apc.add(dlg.meta,dlg.uname,dlg.upass)
+                self.apc.add(dlg.meta,dlg.uname,dlg.upass,dlg.remark,dlg.kgroup)
             except Exception as Err:
                 wx.MessageBox(_("Unable to save credential!\n")+unicode(Err),_("Error"),0|wx.ICON_ERROR,self)
                 return
@@ -301,9 +311,8 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
         if dlg.ShowModal()==wx.ID_OK:
             #self.apc.add(dlg.meta,dlg.uname,dlg.upass)
             try:
-                self.apc.add(dlg.meta,dlg.uname,dlg.upass)
+                self.apc.add(dlg.meta,dlg.uname,dlg.upass,dlg.remark,dlg.kgroup)
             except Exception as Err:
-                print Err
                 wx.MessageBox(_("Unable to save credential!\n")+unicode(Err),_("Error"),0|wx.ICON_ERROR,self)
                 return
             try:
@@ -364,6 +373,17 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
         dlg.ShowModal()
         dlg.Destroy()
 
+    @PauseLockWhileBusy
+    def OnShowCred(self,evt):
+        sel_item=self.GetSelection()
+        if not sel_item.IsOk():
+            wx.MessageBox(_("Select a line first!"),_("Error"),0|wx.ICON_ERROR,self)
+            return
+        i=self.GetItemData(sel_item)
+        dlg=addDiag.AddPassDiag(self,self.passlist[i]['Meta'],self.passlist[i]['Uname'],self.passlist[i]['Pass'],self.passlist[i]['Remark'],self.passlist[i]['Kgroup'],readonly=True)
+        dlg.ShowModal()
+        dlg.Destroy()
+
 
 
 class MyTaskbarIcon(wx.TaskBarIcon):
@@ -393,6 +413,7 @@ class MainPannel(wx.Frame):
         # begin wxGlade: MainPannel.__init__
         self.version=1.0
         self.canlock=True
+        self.listall=False
         self.last_copied_pass=None
         wx.Frame.__init__(self,parent,size=(1000,1000),style=wx.TAB_TRAVERSAL|wx.DEFAULT_FRAME_STYLE|wx.WANTS_CHARS)
         self.DWorkerPool=dpool
@@ -502,7 +523,7 @@ class MainPannel(wx.Frame):
             os.path.join(self.confDict["confDir"],"ee.key"),self.upass,
             self.DWorkerPool,self.EWrokerPool)
         except Exception as Err:
-            traceback.print_exc(Err)
+##            traceback.print_exc(Err)
             wx.MessageBox(_("Failed to connect to the server!"),_("Error"),0|wx.ICON_ERROR,self)
             self.ExitMe()
             return
@@ -561,6 +582,7 @@ class MainPannel(wx.Frame):
         self.Bind(common.EVT_MANPASS_FATALERR,self.OnFatal)
         self.Bind(common.EVT_MANPASS_PROGRESS,self.UpdateProgress)
         self.Bind(common.EVT_MANPASS_LOAD_DONE,self.LoadDone)
+        self.Bind(wx.EVT_SET_FOCUS,self.OnFocus)
 
         if platform.system()=="Windows":
             import win32con
@@ -632,6 +654,8 @@ class MainPannel(wx.Frame):
         self.list_ctrl_1.Show(True)
         self.text_ctrl_search_input.Show(True)
         self.Layout()
+        self.listall=False
+        self.ShowHidden()
         self.timer_lock.Start(self.confDict["idle_timer"]*1000,wx.TIMER_CONTINUOUS)
         self.text_ctrl_search_input.SetFocus()
 
@@ -642,7 +666,7 @@ class MainPannel(wx.Frame):
         self.lock_label.Show(True)
         self.progress_bar.Hide()
         self.Layout()
-        self.lock_label.SetFocus()
+
 
     def showLoading(self):
         self.timer_lock.Stop()
@@ -651,6 +675,7 @@ class MainPannel(wx.Frame):
         self.lock_label.Show(False)
         self.progress_bar.Show(True)
         self.Layout()
+
 
 
 
@@ -667,6 +692,16 @@ class MainPannel(wx.Frame):
         self.list_ctrl_1.reloadWithoutGet()
         evt.Skip()
 
+    def ShowHidden(self):
+        if self.listall==True:
+            self.text_ctrl_search_input.SetBackgroundColour(wx.TheColourDatabase.Find("DARK GREY"))
+            self.text_ctrl_search_input.SetForegroundColour(wx.TheColourDatabase.Find("WHITE"))
+        else:
+            self.text_ctrl_search_input.SetBackgroundColour(wx.NullColour)
+            self.text_ctrl_search_input.SetForegroundColour(wx.NullColour)
+        self.text_ctrl_search_input.Refresh()
+        self.list_ctrl_1.reloadWithoutGet()
+
     def OnChar(self,evt):
         self.resetTimer(None)
         if evt.GetKeyCode()==wx.WXK_ESCAPE:
@@ -674,8 +709,14 @@ class MainPannel(wx.Frame):
                 self.HideMe(None)
                 evt.Skip()
                 return
-
             self.text_ctrl_search_input.Clear()
+        else:
+            if evt.GetKeyCode()==wx.WXK_CONTROL_H:
+                if evt.GetModifiers() == wx.MOD_CONTROL+wx.MOD_SHIFT:
+                    self.listall=not self.listall
+                    self.ShowHidden()
+                    return
+
         evt.Skip()
 
     def ShowAbout(self):
@@ -775,6 +816,11 @@ class MainPannel(wx.Frame):
             wx.TheClipboard.Close()
         else:
             self.timer_clear.Start(1000*3,wx.TIMER_ONE_SHOT)
+
+    def OnFocus(self,evt):
+        if self.text_ctrl_search_input.IsShown()==False:
+            self.lock_label.SetFocus()
+
 
 
 

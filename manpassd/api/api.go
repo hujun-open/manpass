@@ -136,6 +136,8 @@ func (csvr ClientAPISVR) addRecord(resp http.ResponseWriter, req *http.Request) 
 	r.Meta_id = x["meta_id"].(string)
 	r.Uname = x["uname"].(string)
 	r.Pass = x["pass"].(string)
+	r.Remark = x["remark"].(string)
+	r.Kgroup = x["kgroup"].(string)
 	err = csvr.PDB.Insert(csvr.Tablename, r)
 	if err != nil {
 		resp.WriteHeader(http.StatusInternalServerError)

@@ -9,6 +9,8 @@ import (
 	"manpassd/common"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -16,18 +18,20 @@ const (
 	CREATEDBSQL = `
 	drop table if exists %[1]s;
 	create table %[1]s (
-		meta_id blob not null ,/* sha256 of key and uname*/
+		meta_id blob not null ,/* sha256 of meta,uname and kgroup*/
 		pass_rev INTEGER not null,
-		meta blob not null, /* key is the meta data associated with username/password, could be a URL */
+		meta blob not null, /* this is the meta data associated with username/password, could be a URL, encrypted */
 		uname blob not null, /* username, encrypted*/
-		pass blob not null, /* current password, encrypted */
+		pass blob not null, /* password, encrypted */
 		pass_time timestamp default CURRENT_TIMESTAMP,
+		remark blob, /*encrypted*/ 
+		kgroup blob,/*encrypted*/
 		primary key (meta_id,pass_rev)
 	);
 	
 	`
 	INSERTSQL = `
-	insert into %[1]s (uname,pass,meta,meta_id,pass_rev) select ?,?,?,?,
+	insert into %[1]s (uname,pass,meta,meta_id,remark,kgroup,pass_rev) select ?,?,?,?,?,?,
 	case 
 		when exists
 			(select pass_rev from %[1]s where meta_id=?)
@@ -38,7 +42,7 @@ const (
 	from %[1]s where meta_id=?
 	`
 	UPDATESQL = `
-	update or fail %[1]s set meta=?, uname=?, pass=? where meta_id=? and pass_rev=?
+	update or fail %[1]s set meta=?, uname=?, pass=?,remark=?,kgroup=? where meta_id=? and pass_rev=?
 	`
 )
 
@@ -53,6 +57,8 @@ type PassRecord struct {
 	Uname     string
 	Pass      string
 	Pass_time time.Time
+	Remark    string
+	Kgroup    string
 }
 
 func CheckDB(filename string) error {
@@ -128,7 +134,7 @@ func (pdb PassDB) Insert(tablename string, pr PassRecord) error {
 		tx.Rollback()
 		return err
 	}
-	_, err = tx.Exec(fmt.Sprintf(INSERTSQL, tablename), pr.Uname, pr.Pass, pr.Meta, pr.Meta_id, pr.Meta_id, pr.Meta_id)
+	_, err = tx.Exec(fmt.Sprintf(INSERTSQL, tablename), pr.Uname, pr.Pass, pr.Meta, pr.Meta_id, pr.Remark, pr.Kgroup, pr.Meta_id, pr.Meta_id)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -148,7 +154,7 @@ func (pdb PassDB) ReplaceAll(tablename string, prlist []PassRecord) error {
 		return err
 	}
 	for _, pr := range prlist {
-		_, err = tx.Exec(fmt.Sprintf(UPDATESQL, tablename), pr.Meta, pr.Uname, pr.Pass, pr.Meta_id, pr.Pass_rev)
+		_, err = tx.Exec(fmt.Sprintf(UPDATESQL, tablename), pr.Meta, pr.Uname, pr.Pass, pr.Meta_id, pr.Pass_rev, pr.Remark, pr.Kgroup)
 		if err != nil {
 			tx.Rollback()
 			return err
@@ -181,7 +187,19 @@ func (pdb PassDB) GetRecord(tablename string, meta_id string, pass_rev int) (*Pa
 	defer rows.Close()
 	i := 0
 	for rows.Next() {
-		err := rows.Scan(&r.Meta_id, &r.Pass_rev, &r.Meta, &r.Uname, &r.Pass, &r.Pass_time)
+		var rem []byte
+		var kg []byte
+		err := rows.Scan(&r.Meta_id, &r.Pass_rev, &r.Meta, &r.Uname, &r.Pass, &r.Pass_time, &rem, &kg)
+		if kg == nil {
+			r.Kgroup = ""
+		} else {
+			r.Kgroup = string(kg)
+		}
+		if rem == nil {
+			r.Remark = ""
+		} else {
+			r.Remark = string(rem)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -190,7 +208,56 @@ func (pdb PassDB) GetRecord(tablename string, meta_id string, pass_rev int) (*Pa
 	if i == 0 {
 		return nil, err
 	}
+	log.Println(r)
 	return r, nil
+}
+
+func (pdb PassDB) Dump(tablename string) (string, error) {
+	//dump the content of specified table into a string of sql insert statements
+	rows, err := pdb.PDB.Query(fmt.Sprintf("select * from %s;", tablename))
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+	col_list, err := rows.Columns()
+	if err != nil {
+		return "", err
+	}
+	count := len(col_list)
+	values := make([]interface{}, count)
+	valuePtrs := make([]interface{}, count)
+	rs := ""
+	cols := ""
+	for _, v := range col_list {
+		cols += v + ","
+	}
+	cols = strings.TrimRight(cols, ",")
+	for rows.Next() {
+		for i := 0; i < count; i++ {
+			valuePtrs[i] = &values[i]
+		}
+		rows.Scan(valuePtrs...)
+		rs += "insert into " + tablename + " (" + cols + ") values ("
+		for i, _ := range col_list {
+			val := values[i]
+			switch v := val.(type) {
+			case int64:
+				rs += strconv.FormatUint(uint64(v), 10) + ","
+			case int:
+				rs += strconv.FormatUint(uint64(v), 10) + ","
+			case float64:
+				rs += strconv.FormatFloat(v, 'f', -1, 32) + ","
+			case time.Time:
+				rs += "'" + v.Format("2006-01-02 15:04:05") + "',"
+			default:
+				rs += "'" + string(v.([]byte)) + "',"
+			}
+		}
+		rs = strings.TrimRight(rs, ",")
+		rs += ");\n"
+
+	}
+	return rs, nil
 }
 
 func (pdb PassDB) GetAll(tablename string) ([]PassRecord, error) {
@@ -204,7 +271,19 @@ func (pdb PassDB) GetAll(tablename string) ([]PassRecord, error) {
 	}
 	defer rows.Close()
 	for rows.Next() {
-		err := rows.Scan(&r.Meta_id, &r.Pass_rev, &r.Meta, &r.Uname, &r.Pass, &r.Pass_time)
+		var rem []byte
+		var kg []byte
+		err := rows.Scan(&r.Meta_id, &r.Pass_rev, &r.Meta, &r.Uname, &r.Pass, &r.Pass_time, &rem, &kg)
+		if kg == nil {
+			r.Kgroup = ""
+		} else {
+			r.Kgroup = string(kg)
+		}
+		if rem == nil {
+			r.Remark = ""
+		} else {
+			r.Remark = string(rem)
+		}
 		if err == nil {
 			rlist = append(rlist, *r)
 		}
@@ -222,12 +301,16 @@ func (pdb PassDB) GetAllLatest(tablename string) ([]PassRecord, error) {
 	}
 	defer rows.Close()
 	var mid string
+	log.Println(tablename)
 	for rows.Next() {
+		log.Println("getting rows")
 		err := rows.Scan(&mid)
 		if err == nil {
 			r, err := pdb.GetRecord(tablename, mid, -1)
 			if err == nil {
 				rlist = append(rlist, *r)
+			} else {
+				log.Println(err)
 			}
 
 		}
@@ -266,7 +349,19 @@ func (pdb PassDB) GetAllRevForMetaId(tablename string, meta_id string) ([]PassRe
 	}
 	defer rows.Close()
 	for rows.Next() {
-		err := rows.Scan(&r.Meta_id, &r.Pass_rev, &r.Meta, &r.Uname, &r.Pass, &r.Pass_time)
+		var rem []byte
+		var kg []byte
+		err := rows.Scan(&r.Meta_id, &r.Pass_rev, &r.Meta, &r.Uname, &r.Pass, &r.Pass_time, &rem, &kg)
+		if kg == nil {
+			r.Kgroup = ""
+		} else {
+			r.Kgroup = string(kg)
+		}
+		if rem == nil {
+			r.Remark = ""
+		} else {
+			r.Remark = string(rem)
+		}
 		if err == nil {
 			rlist = append(rlist, *r)
 		}

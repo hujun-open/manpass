@@ -74,8 +74,8 @@ class APIClient:
         self.DWorkerPool=dpool
         self.EWorkerPool=epool
 
-    def add(self,meta,uname,passwd):
-        self.EWorkerPool.taskQ.put((meta,uname,passwd,-1,self.masterpass))
+    def add(self,meta,uname,passwd,remark="",kgroup="NORMAL"):
+        self.EWorkerPool.taskQ.put((meta,uname,passwd,remark,kgroup,-1,self.masterpass))
         body=json.dumps(self.EWorkerPool.doneQ.get())
         self.conn.request("POST",self.urlpath,body)
         resp=self.conn.getresponse()
@@ -86,7 +86,7 @@ class APIClient:
 
     def addlist(self,plist,win=None):
         for p in plist:
-            self.EWorkerPool.taskQ.put(p['meta'],p['uname'],p['pass'],-1,self.masterpass)
+            self.EWorkerPool.taskQ.put(p['meta'],p['uname'],p['pass'],p['remark'],p['kgroup'],-1,self.masterpass)
 
 
 
@@ -170,7 +170,6 @@ class APIClient:
 
     def getAllMetaId(self):
         self.conn.request("GET",self.urlpath+"/meta-id")
-        print self.urlpath+"/meta-id"
         resp=self.conn.getresponse()
         if resp.status !=200:
             resp.read()
@@ -180,7 +179,6 @@ class APIClient:
                 raise APITransactionError(self.conn,"Failed to get record")
         else:
             raw_body=resp.read()
-            print raw_body
             rlist=json.loads(raw_body)
             return rlist
 
@@ -199,7 +197,6 @@ class APIClient:
                         wx.PostEvent(win,fevt)
                     return []
                 else:
-                    print resp.status
                     raise APITransactionError(self.conn,"Failed to get record")
             else:
                 raw_body=resp.read()
@@ -220,7 +217,7 @@ class APIClient:
                     wx.PostEvent(win,fevt)
                 return nr_list
         except Exception as Err:
-            traceback.print_exc(Err)
+##            traceback.print_exc(Err)
             if win!=None:
                 eevt=common.ManpassFatalErrEVT(Value=_("Unable to get records!\n")+unicode(Err))
                 wx.PostEvent(win,eevt)
@@ -250,7 +247,6 @@ class APIClient:
             else:
                 raw_body=resp.read()
                 rlist=json.loads(raw_body)
-
                 for r in rlist:
                     self.DWorkerPool.taskQ.put((r,self.masterpass))
                 nr_list=[]
@@ -268,7 +264,7 @@ class APIClient:
                     wx.PostEvent(win,fevt)
                 return nr_list
         except Exception as Err:
-            traceback.print_exc(Err)
+##            traceback.print_exc(Err)
             if win!=None:
                 eevt=common.ManpassFatalErrEVT(Value=_("Unable to get records!\n")+unicode(Err))
                 wx.PostEvent(win,eevt)
@@ -282,7 +278,7 @@ class APIClient:
         i=0
 
         for r in rlist:
-            self.EWorkerPool.taskQ.put((r['Meta'],r['Uname'],r['Pass'],r['Pass_rev'],newpass))
+            self.EWorkerPool.taskQ.put((r['Meta'],r['Uname'],r['Pass'],r['Remark'],r['Kgroup'],r['Pass_rev'],newpass))
         list_len=len(rlist)
         for i in range(list_len):
             reqlist.append(self.EWorkerPool.doneQ.get())
@@ -326,17 +322,23 @@ def genRecord(inputQ,outputQ):
     #return a record, meta,uname,passwd are encrypted with passwd
     try:
         while True:
-            (meta,uname,passwd,pass_rev,mpass)=inputQ.get()
+            (meta,uname,passwd,remark,kgroup,pass_rev,mpass)=inputQ.get()
             r={}
             n_meta=meta
             n_uname=uname
             n_passwd=passwd
+            n_remark=remark
+            n_kgroup=kgroup
             if isinstance(meta,unicode):
                 n_meta=meta.encode("utf-8")
             if isinstance(uname,unicode):
                 n_uname=uname.encode("utf-8")
             if isinstance(passwd,unicode):
                 n_passwd=passwd.encode("utf-8")
+            if isinstance(remark,unicode):
+                n_remark=remark.encode("utf-8")
+            if isinstance(kgroup,unicode):
+                n_kgroup=kgroup.encode("utf-8")
             r['meta_id']=genMetaid(meta,uname)
             salt=passcrypto.GenerateSalt()
             mp=mpass
@@ -344,9 +346,12 @@ def genRecord(inputQ,outputQ):
             r['meta']=passcrypto.EncryptWithoutSaltBase32(n_meta,skey,salt)
             r['uname']=passcrypto.EncryptWithoutSaltBase32(n_uname,skey,salt)
             r['pass']=passcrypto.EncryptWithoutSaltBase32(n_passwd,skey,salt)
+            r['remark']=passcrypto.EncryptWithoutSaltBase32(n_remark,skey,salt)
+            r['kgroup']=passcrypto.EncryptWithoutSaltBase32(n_kgroup,skey,salt)
             if pass_rev!=-1:
                 r['pass_rev']=pass_rev
             #return json.dumps(r)
+##            print "r is ",r
             outputQ.put(r)
     except Exception as Err:
         print traceback.format_exc()
@@ -363,15 +368,22 @@ def decryptRecordWithSingleSalt(inputQ,outputQ):
             ds=enc.decode(cipherR['Pass'])
             skey=passcrypto.GenerateEncKey(masterpass,ds[:passcrypto.SaltSize])
             for k,v in cipherR.items():
-                if k=='Uname' or k=="Pass" or k=='Meta':
-                    ds=enc.decode(v)
-                    RR[k]=passcrypto.DecryptWithoutSalt(ds[passcrypto.SaltSize:],skey)
+                if k=='Uname' or k=="Pass" or k=='Meta' or k=="Kgroup" or k=="Remark":
+                    if len(v)>0:
+                        ds=enc.decode(v)
+                        RR[k]=passcrypto.DecryptWithoutSalt(ds[passcrypto.SaltSize:],skey)
+                    else:
+                        RR[k]=u""
+
+
+
 
             for k,v in RR.items():
-                if k=="Uname" or k=="Meta":
+                if k=="Uname" or k=="Meta" or k=="Kgroup" or k=="Remark":
                     RR[k]=RR[k].decode('utf-8')
             RR["Pass_rev"]=cipherR['Pass_rev']
             RR["Pass_time"]=common.getLocalTime(cipherR['Pass_time'])
+##            print "RR is ",RR
             outputQ.put(RR)
     except Exception as Err:
         print traceback.format_exc()
