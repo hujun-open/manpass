@@ -167,6 +167,7 @@ class ChangeMasterPassDiag(wx.Dialog):
 
 
             except Exception as Err:
+                traceback.print_exc(Err)
                 errevt=common.ManpassErrEVT(Value=unicode(Err))
                 wx.PostEvent(self,errevt)
                 traceback.print_exc(Err)

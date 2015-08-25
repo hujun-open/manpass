@@ -24,6 +24,7 @@ import os.path
 import wx
 import multiprocessing
 import traceback
+import passcrypto
 
 _ = wx.GetTranslation
 
@@ -121,6 +122,7 @@ class APIClient:
         if resp.status !=200:
             raise APITransactionError(self.conn,"Failed to remove record")
         resp.read()
+
 
 
 
@@ -225,6 +227,48 @@ class APIClient:
             else:
                 raise Err
 
+
+
+    def dump(self,win=None):
+        try:
+            self.conn.connect()
+            self.conn.request("GET",self.urlpath+"/dumpme")
+            resp=self.conn.getresponse()
+            if resp.status !=200:
+                resp.read()
+                raise APITransactionError(self.conn,"dump failed")
+            else:
+                raw_body=resp.read()
+                return passcrypto.HashMsg(raw_body,self.masterpass)
+        except Exception as Err:
+##            traceback.print_exc(Err)
+            if win!=None:
+                eevt=common.ManpassFatalErrEVT(Value=_("Unable to get records!\n")+unicode(Err))
+                wx.PostEvent(win,eevt)
+                return []
+            else:
+                raise Err
+
+
+    def importJson(self,jstr,win=None):
+        try:
+            rs=passcrypto.VerifyHash(jstr,self.masterpass)
+            if rs==False:
+                raise ValueError(_("The database to be imported is corrupted!"))
+            self.conn.connect()
+            self.conn.request("PUT",self.urlpath+"/import",rs)
+            resp=self.conn.getresponse()
+            resp.read()
+            if resp.status !=200:
+                raise APITransactionError(self.conn,"import failed")
+        except Exception as Err:
+            traceback.print_exc(Err)
+            if win!=None:
+                eevt=common.ManpassFatalErrEVT(Value=_("Unable to get records!\n")+unicode(Err))
+                wx.PostEvent(win,eevt)
+                return []
+            else:
+                raise Err
 
 
 

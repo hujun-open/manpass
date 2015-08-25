@@ -3,6 +3,7 @@ package passsql
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	_ "github.com/mattn/go-sqlite3"
 	"log"
@@ -43,6 +44,9 @@ const (
 	`
 	UPDATESQL = `
 	update or fail %[1]s set meta=?, uname=?, pass=?,remark=?,kgroup=? where meta_id=? and pass_rev=?
+	`
+	LOADSQL = `
+	insert into %[1]s (uname,pass,meta,meta_id,remark,kgroup,pass_rev,pass_time) values (?,?,?,?,?,?,?,?);
 	`
 )
 
@@ -134,7 +138,7 @@ func (pdb PassDB) Insert(tablename string, pr PassRecord) error {
 		tx.Rollback()
 		return err
 	}
-	_, err = tx.Exec(fmt.Sprintf(INSERTSQL, tablename), pr.Uname, pr.Pass, pr.Meta, pr.Meta_id, pr.Remark, pr.Kgroup, pr.Meta_id, pr.Meta_id)
+	_, err = tx.Exec(fmt.Sprintf(INSERTSQL, tablename), pr.Uname, pr.Pass, pr.Meta, pr.Remark, pr.Kgroup, pr.Pass_time)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -154,7 +158,28 @@ func (pdb PassDB) ReplaceAll(tablename string, prlist []PassRecord) error {
 		return err
 	}
 	for _, pr := range prlist {
-		_, err = tx.Exec(fmt.Sprintf(UPDATESQL, tablename), pr.Meta, pr.Uname, pr.Pass, pr.Meta_id, pr.Pass_rev, pr.Remark, pr.Kgroup)
+		_, err = tx.Exec(fmt.Sprintf(UPDATESQL, tablename), pr.Meta, pr.Uname, pr.Pass, pr.Remark, pr.Kgroup, pr.Meta_id, pr.Pass_rev)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (pdb PassDB) Load(tablename string, prlist []PassRecord) error {
+	tx, err := pdb.PDB.Begin()
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	for _, pr := range prlist {
+
+		_, err = tx.Exec(fmt.Sprintf(LOADSQL, tablename), pr.Uname, pr.Pass, pr.Meta, pr.Meta_id, pr.Remark, pr.Kgroup, pr.Pass_rev, pr.Pass_time)
 		if err != nil {
 			tx.Rollback()
 			return err
@@ -208,12 +233,18 @@ func (pdb PassDB) GetRecord(tablename string, meta_id string, pass_rev int) (*Pa
 	if i == 0 {
 		return nil, err
 	}
-	log.Println(r)
 	return r, nil
 }
 
-func (pdb PassDB) Dump(tablename string) (string, error) {
-	//dump the content of specified table into a string of sql insert statements
+func (pdb PassDB) Dump(tablename string, outformat string) (string, error) {
+	//dump the content of specified table into a string of sql insert statements or json
+	//outformt is "sql"|"json"
+	var rs string
+	rs = ""
+	if outformat != "sql" && outformat != "json" {
+		return "", fmt.Errorf("Dump doesn't support %s as output format", outformat)
+	}
+
 	rows, err := pdb.PDB.Query(fmt.Sprintf("select * from %s;", tablename))
 	if err != nil {
 		return "", err
@@ -223,43 +254,112 @@ func (pdb PassDB) Dump(tablename string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	count := len(col_list)
-	values := make([]interface{}, count)
-	valuePtrs := make([]interface{}, count)
-	rs := ""
-	cols := ""
-	for _, v := range col_list {
-		cols += v + ","
-	}
-	cols = strings.TrimRight(cols, ",")
-	for rows.Next() {
-		for i := 0; i < count; i++ {
-			valuePtrs[i] = &values[i]
-		}
-		rows.Scan(valuePtrs...)
-		rs += "insert into " + tablename + " (" + cols + ") values ("
-		for i, _ := range col_list {
-			val := values[i]
-			switch v := val.(type) {
-			case int64:
-				rs += strconv.FormatUint(uint64(v), 10) + ","
-			case int:
-				rs += strconv.FormatUint(uint64(v), 10) + ","
-			case float64:
-				rs += strconv.FormatFloat(v, 'f', -1, 32) + ","
-			case time.Time:
-				rs += "'" + v.Format("2006-01-02 15:04:05") + "',"
-			default:
-				rs += "'" + string(v.([]byte)) + "',"
-			}
-		}
-		rs = strings.TrimRight(rs, ",")
-		rs += ");\n"
 
+	switch outformat {
+	case "sql":
+		count := len(col_list)
+		values := make([]interface{}, count)
+		valuePtrs := make([]interface{}, count)
+		cols := ""
+		if outformat == "sql" {
+			for _, v := range col_list {
+				cols += v + ","
+			}
+			cols = strings.TrimRight(cols, ",")
+		}
+
+		for rows.Next() {
+			for i := 0; i < count; i++ {
+				valuePtrs[i] = &values[i]
+			}
+			rows.Scan(valuePtrs...)
+			rs += "insert into " + tablename + " (" + cols + ") values ("
+			for i, _ := range col_list {
+				val := values[i]
+				switch v := val.(type) {
+				case int64:
+					rs += strconv.FormatUint(uint64(v), 10) + ","
+				case int:
+					rs += strconv.FormatUint(uint64(v), 10) + ","
+				case float64:
+					rs += strconv.FormatFloat(v, 'f', -1, 32) + ","
+				case time.Time:
+					rs += "'" + v.Format("2006-01-02 15:04:05") + "',"
+				case nil:
+					rs += "'',"
+				default:
+					rs += "'" + string(v.([]byte)) + "',"
+				}
+			}
+			rs = strings.TrimRight(rs, ",")
+			rs += ");\n"
+		}
+		return rs, nil
+	case "json":
+		var rlist []PassRecord
+		for rows.Next() {
+			r := new(PassRecord)
+			var rem []byte
+			var kg []byte
+			err := rows.Scan(&r.Meta_id, &r.Pass_rev, &r.Meta, &r.Uname, &r.Pass, &r.Pass_time, &rem, &kg)
+			if kg == nil {
+				r.Kgroup = ""
+			} else {
+				r.Kgroup = string(kg)
+			}
+			if rem == nil {
+				r.Remark = ""
+			} else {
+				r.Remark = string(rem)
+			}
+			if err != nil {
+				return "", err
+			}
+			rlist = append(rlist, *r)
+		}
+		rs, err := json.Marshal(rlist)
+		if err != nil {
+			return "", err
+		}
+		return string(rs), nil
 	}
-	return rs, nil
+	return "", fmt.Errorf("Dump: unsupported outformat")
 }
 
+func (pdb PassDB) Import(tablename string, inputstr string, informat string) error {
+	if informat != "json" && informat != "sql" {
+		return fmt.Errorf("Import doesn't support %s", informat)
+	}
+	switch informat {
+	case "json":
+		rlist := make([]map[string]interface{}, 4096)
+		err := json.Unmarshal([]byte(inputstr), &rlist)
+		if err != nil {
+			return err
+		}
+		var r PassRecord
+		var plist []PassRecord
+		for _, x := range rlist {
+			r.Meta = x["Meta"].(string)
+			r.Meta_id = x["Meta_id"].(string)
+			r.Uname = x["Uname"].(string)
+			r.Pass = x["Pass"].(string)
+			r.Pass_rev = int(x["Pass_rev"].(float64))
+			r.Remark = x["Remark"].(string)
+			r.Kgroup = x["Kgroup"].(string)
+			r.Pass_time, err = time.Parse("2006-01-02T15:04:05Z", x["Pass_time"].(string))
+			if err != nil {
+				return err
+			}
+			plist = append(plist, r)
+		}
+		err = pdb.Load(tablename, plist)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
 func (pdb PassDB) GetAll(tablename string) ([]PassRecord, error) {
 	// return all records in the table
 	rlist := []PassRecord{}
@@ -301,9 +401,7 @@ func (pdb PassDB) GetAllLatest(tablename string) ([]PassRecord, error) {
 	}
 	defer rows.Close()
 	var mid string
-	log.Println(tablename)
 	for rows.Next() {
-		log.Println("getting rows")
 		err := rows.Scan(&mid)
 		if err == nil {
 			r, err := pdb.GetRecord(tablename, mid, -1)

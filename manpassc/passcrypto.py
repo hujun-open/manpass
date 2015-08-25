@@ -3,6 +3,7 @@ import nacl
 import nacl.secret
 import nacl.utils
 import nacl.encoding
+import nacl.hash
 
 KeySize   = 32
 NonceSize = 24
@@ -64,9 +65,25 @@ def DecryptMeBase32(cipher,passwd):
 
 
 
+def HashMsg(msg,skey):
+    h=nacl.hash.sha256(skey+msg)
+    return h+msg
+
+def VerifyHash(msg,skey):
+    if len(msg)<=64:
+        return False
+    h=msg[0:64]
+    nh=nacl.hash.sha256(skey+msg[64:])
+    if nh==h:
+        return msg[64:]
+    else:
+        return False
+
 
 
 if __name__ == '__main__':
+    s=HashMsg("xixixi","z123")
+    print VerifyHash(s+"1","z123")
 ##    clear="hello world!"
 ##    passwd="alu123"
 ##    s=EncryptMeBase32(clear,passwd)
@@ -74,9 +91,9 @@ if __name__ == '__main__':
 ##        print "error!"
 ##    else:
 ##        print "ok"
-    inf=open("d:\\temp\\tls\\root.cer","rb")
-    clear=inf.read()
-    inf.close()
-    outf=open("d:\\temp\\tls\\root.encrypted","w")
-    outf.write(EncryptMeBase32(clear,"alu123"))
-    outf.close()
+##    inf=open("d:\\temp\\tls\\root.cer","rb")
+##    clear=inf.read()
+##    inf.close()
+##    outf=open("d:\\temp\\tls\\root.encrypted","w")
+##    outf.write(EncryptMeBase32(clear,"alu123"))
+##    outf.close()

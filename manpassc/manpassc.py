@@ -209,32 +209,38 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
 
     def createPopMenu(self):
         self.pmenu=wx.Menu()
-        mitem=self.pmenu.Append(wx.NewId(),_("Copy Username"))
+        mitem=self.pmenu.Append(wx.NewId(),_("Copy &Username"))
         self.Bind(wx.EVT_MENU, self.OnCopyUname, id=mitem.GetId())
-        mitem=self.pmenu.Append(wx.NewId(),_("Show Password as QR code"))
+        mitem=self.pmenu.Append(wx.NewId(),_("Show Password as &QR code"))
         self.Bind(wx.EVT_MENU, self.ShowPass, id=mitem.GetId())
+        mitem=self.pmenu.Append(wx.NewId(),_("&Lock"))
+        self.Bind(wx.EVT_MENU, self.OnLock, id=mitem.GetId())
         self.pmenu.AppendSeparator()
-        mitem=self.pmenu.Append(wx.NewId(),_("Add ..."))
+        mitem=self.pmenu.Append(wx.NewId(),_("&Add ..."))
         self.Bind(wx.EVT_MENU, self.OnAdd, id=mitem.GetId())
-        mitem=self.pmenu.Append(wx.NewId(),_("Reload"))
+        mitem=self.pmenu.Append(wx.NewId(),_("&Reload"))
         self.Bind(wx.EVT_MENU, self.OnReload, id=mitem.GetId())
         self.pmenu.AppendSeparator()
-        mitem=self.pmenu.Append(wx.NewId(),_("Change ..."))
+        mitem=self.pmenu.Append(wx.NewId(),_("&Change ..."))
         self.Bind(wx.EVT_MENU, self.OnChangePass, id=mitem.GetId())
-        mitem=self.pmenu.Append(wx.NewId(),_("List history passwords ..."))
+        mitem=self.pmenu.Append(wx.NewId(),_("List &history passwords ..."))
         self.Bind(wx.EVT_MENU, self.OnListAllPass, id=mitem.GetId())
         mitem=self.pmenu.Append(wx.NewId(),_("Show ..."))
         self.Bind(wx.EVT_MENU, self.OnShowCred, id=mitem.GetId())
-
         mitem=self.pmenu.Append(wx.NewId(),_("Delete"))
         self.Bind(wx.EVT_MENU, self.OnDel, id=mitem.GetId())
+
         self.pmenu.AppendSeparator()
-        mitem=self.pmenu.Append(wx.NewId(),_("Lock"))
-        self.Bind(wx.EVT_MENU, self.OnLock, id=mitem.GetId())
-        mitem=self.pmenu.Append(wx.NewId(),_("Option"))
+        self.submenu_adv=wx.Menu()
+        mitem=self.submenu_adv.Append(wx.NewId(),_("Option"))
         self.Bind(wx.EVT_MENU, self.OnOption, id=mitem.GetId())
-        mitem=self.pmenu.Append(wx.NewId(),_("Change master password..."))
+        mitem=self.submenu_adv.Append(wx.NewId(),_("Backup DB..."))
+        self.Bind(wx.EVT_MENU, self.OnBackup, id=mitem.GetId())
+        mitem=self.submenu_adv.Append(wx.NewId(),_("Import DB..."))
+        self.Bind(wx.EVT_MENU, self.OnImport, id=mitem.GetId())
+        mitem=self.submenu_adv.Append(wx.NewId(),_("Change master password..."))
         self.Bind(wx.EVT_MENU, self.OnChangeMasterPass, id=mitem.GetId())
+        self.pmenu.AppendMenu(wx.NewId(),_("Advanced"),self.submenu_adv)
         self.pmenu.AppendSeparator()
         mitem=self.pmenu.Append(wx.NewId(),_("About"))
         self.Bind(wx.EVT_MENU, self.OnAbout, id=mitem.GetId())
@@ -305,7 +311,7 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
 
     def OnReload(self,evt):
         self.reload()
-
+    @PauseLockWhileBusy
     def OnAdd(self,evt):
         dlg=addDiag.AddPassDiag(self)
         if dlg.ShowModal()==wx.ID_OK:
@@ -383,6 +389,55 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
         dlg=addDiag.AddPassDiag(self,self.passlist[i]['Meta'],self.passlist[i]['Uname'],self.passlist[i]['Pass'],self.passlist[i]['Remark'],self.passlist[i]['Kgroup'],readonly=True)
         dlg.ShowModal()
         dlg.Destroy()
+
+    @PauseLockWhileBusy
+    def OnBackup(self,evt):
+        waitbox=wx.BusyInfo(_("Backuping database, please wait..."))
+        try:
+            rs=self.apc.dump()
+        except Exception as Err:
+            del waitbox
+            wx.MessageBox(_("Unable to backup database!\n")+unicode(Err),_("Error"),0|wx.ICON_ERROR,self)
+            return
+
+        del waitbox
+        dlg = wx.FileDialog(
+            self, message=_("Save Backup database as ..."), defaultDir=os.getcwd(),
+            defaultFile=self.GetParent().uname+".manpassdb",
+            wildcard="Manpass DB backup files (*.manpassdb)|*.manpassdb",
+            style=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT
+            )
+        if dlg.ShowModal()==wx.ID_OK:
+            fpath=dlg.GetPath()
+            outf=open(fpath,"wb")
+            outf.write(rs)
+            outf.close()
+            wx.MessageBox(_("Database backuped successfully as ")+fpath,_("Done"),wx.OK,self)
+
+
+    @PauseLockWhileBusy
+    def OnImport(self,evt):
+        dlg = wx.FileDialog(
+            self, message=_("Choose the database file to be imported"), defaultDir=os.getcwd(),
+            defaultFile=self.GetParent().uname+".manpassdb",
+            wildcard="Manpass DB backup files (*.manpassdb)|*.manpassdb",
+            style=wx.FD_OPEN|wx.FD_FILE_MUST_EXIST
+            )
+        if dlg.ShowModal()==wx.ID_OK:
+            waitbox=wx.BusyInfo(_("Importing database, please wait..."))
+            fpath=dlg.GetPath()
+            inf=open(fpath,"rb")
+            rjs=inf.read()
+            inf.close()
+            try:
+                self.apc.importJson(rjs)
+            except Exception as Err:
+                del waitbox
+                wx.MessageBox(_("Import database failed!\n")+unicode(Err),_("Error"),0|wx.ICON_ERROR,self)
+                return
+            del waitbox
+            self.reload()
+            wx.MessageBox(_("Database imported successfully"),_("Done"),wx.OK,self)
 
 
 

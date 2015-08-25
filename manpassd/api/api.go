@@ -2,6 +2,8 @@
 package api
 
 import (
+	"bytes"
+	"compress/zlib"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -35,17 +37,24 @@ func (csvr ClientAPISVR) routeClient(resp http.ResponseWriter, req *http.Request
 	case "POST":
 		csvr.addRecord(resp, req)
 	case "GET":
-		if req.URL.Path == "/client/meta-id" {
+		switch req.URL.Path {
+		case "/client/meta-id":
 			csvr.getAllMetaId(resp, req)
-
-		} else {
+		case "/client/dumpme":
+			csvr.dump(resp, req)
+		default:
 			csvr.getRecord(resp, req)
 		}
-
 	case "DELETE":
 		csvr.delRecord(resp, req)
 	case "PUT":
-		csvr.replaceAll(resp, req)
+		switch req.URL.Path {
+		case "/client/import":
+			csvr.importJson(resp, req)
+		default:
+			csvr.replaceAll(resp, req)
+		}
+
 	}
 
 }
@@ -113,6 +122,8 @@ func (csvr ClientAPISVR) replaceAll(resp http.ResponseWriter, req *http.Request)
 		r.Uname = x["uname"].(string)
 		r.Pass = x["pass"].(string)
 		r.Pass_rev = int(x["pass_rev"].(float64))
+		r.Kgroup = x["kgroup"].(string)
+		r.Remark = x["remark"].(string)
 		rlist = append(rlist, r)
 	}
 	err = csvr.PDB.ReplaceAll(csvr.Tablename, rlist)
@@ -195,6 +206,37 @@ func (csvr ClientAPISVR) getAllMetaId(resp http.ResponseWriter, req *http.Reques
 	fmt.Fprintf(resp, string(js))
 	return
 
+}
+func (csvr ClientAPISVR) importJson(resp http.ResponseWriter, req *http.Request) {
+	//import a list of credentials with format as json in request body
+	body, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		log.Println(err)
+		resp.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	err = csvr.PDB.Import(csvr.Tablename, string(body), "json")
+	if err != nil {
+		resp.WriteHeader(http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+	resp.WriteHeader(http.StatusOK)
+	return
+}
+
+func (csvr ClientAPISVR) dump(resp http.ResponseWriter, req *http.Request) {
+	rs, err := csvr.PDB.Dump(csvr.Tablename, "json")
+	if err != nil {
+		resp.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	var b bytes.Buffer
+	w := zlib.NewWriter(&b)
+	w.Write([]byte(rs))
+	w.Close()
+	resp.WriteHeader(http.StatusOK)
+	fmt.Fprintf(resp, b.String())
 }
 
 func (csvr ClientAPISVR) getRecord(resp http.ResponseWriter, req *http.Request) {

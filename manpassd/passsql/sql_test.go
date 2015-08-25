@@ -13,11 +13,22 @@ func TestSqldump(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	js, err := fdb.Dump("hujun")
+	js, err := fdb.Dump("hujun", "json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	ioutil.WriteFile("D:\\hujun\\Dropbox\\manpass_hujun_conf\\hujun.db.dump", []byte(js), 0777)
+	newdbfile := "new.db"
+	newdb, err := InitDB(newdbfile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newdb.InitTable("hujun")
+	err = newdb.Import("hujun", js, "json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 }
 
 //func TestSql(t *testing.T) {
