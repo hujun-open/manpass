@@ -138,7 +138,7 @@ func (pdb PassDB) Insert(tablename string, pr PassRecord) error {
 		tx.Rollback()
 		return err
 	}
-	_, err = tx.Exec(fmt.Sprintf(INSERTSQL, tablename), pr.Uname, pr.Pass, pr.Meta, pr.Remark, pr.Kgroup, pr.Pass_time)
+	_, err = tx.Exec(fmt.Sprintf(INSERTSQL, tablename), pr.Uname, pr.Pass, pr.Meta, pr.Meta_id, pr.Remark, pr.Kgroup, pr.Meta_id, pr.Meta_id)
 	if err != nil {
 		tx.Rollback()
 		return err
