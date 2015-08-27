@@ -152,6 +152,7 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
         for p in self.passlist:
             data=[p['Meta'],p['Uname'],p['Pass_time'],unicode(p['Pass_rev'])]
             if self.GetParent().listall==False and common.isHidden(p["Kgroup"]):
+                i+=1
                 continue
             if filter_key=="" or not self.filterme:
                 self.AppendItem(data,i)
