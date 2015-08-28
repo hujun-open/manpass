@@ -205,7 +205,8 @@ class ChangeMasterPassDiag(wx.Dialog):
         if hasattr(evt,"Type"):
             if evt.Type=='final':
                 wx.MessageBox(_("Master password has been changed successfully!"),_("Done"))
-                self.Destroy()
+                self.Close()
+                #self.Destroy()
         evt.Skip()
 
 # end of class MainPannel

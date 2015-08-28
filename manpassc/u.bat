@@ -10,3 +10,5 @@ copy /Y manpassc.ico .\dist\manpassc\
 copy /Y manpassd.exe .\dist\manpassc\
 copy /Y msvcr120.dll .\dist\manpassc\
 copy /Y py.dat .\dist\manpassc\
+copy /Y help.htm .\dist\manpassc\
+xcopy /S /Y help_files .\dist\manpassc\help_files\

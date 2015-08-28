@@ -2,8 +2,8 @@
 package api
 
 import (
-	"bytes"
-	"compress/zlib"
+	//	"bytes"
+	//	"compress/zlib"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -231,12 +231,12 @@ func (csvr ClientAPISVR) dump(resp http.ResponseWriter, req *http.Request) {
 		resp.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	var b bytes.Buffer
-	w := zlib.NewWriter(&b)
-	w.Write([]byte(rs))
-	w.Close()
+	//	var b bytes.Buffer
+	//	w := zlib.NewWriter(&b)
+	//	w.Write([]byte(rs))
+	//	w.Close()
 	resp.WriteHeader(http.StatusOK)
-	fmt.Fprintf(resp, b.String())
+	fmt.Fprintf(resp, rs)
 }
 
 func (csvr ClientAPISVR) getRecord(resp http.ResponseWriter, req *http.Request) {

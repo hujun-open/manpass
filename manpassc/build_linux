@@ -5,3 +5,5 @@ pyinstaller manpassc.py
 cp manpassc.ico ./dist/manpassc/
 cp manpassd ./dist/manpassc/
 cp py.dat ./dist/manpassc/
+cp help.htm ./dist/manpassc/
+cp -r help_files ./dist/manpassc/

@@ -100,6 +100,7 @@ class NewUserDiag(wx.Dialog):
 
 
         self.Centre()
+        self.text_ctrl_uname.SetFocus()
         # end wxGlade
 
     def __set_properties(self):

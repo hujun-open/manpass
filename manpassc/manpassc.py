@@ -18,6 +18,7 @@ import apiclient
 import addDiag
 import myoptions
 import unlockDiag
+import webbrowser
 import listAllPass
 import changeMasterPassDiag
 import selfDestroyDiag
@@ -245,6 +246,8 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
         self.pmenu.AppendSeparator()
         mitem=self.pmenu.Append(wx.NewId(),_("About"))
         self.Bind(wx.EVT_MENU, self.OnAbout, id=mitem.GetId())
+        mitem=self.pmenu.Append(wx.NewId(),_("Help"))
+        self.Bind(wx.EVT_MENU, self.OnHelp, id=mitem.GetId())
         mitem=self.pmenu.Append(wx.NewId(),_("Exit"))
         self.Bind(wx.EVT_MENU, self.OnExit, id=mitem.GetId())
 ##        mitem=self.pmenu.Append(wx.NewId(),_("Exit All"))
@@ -333,8 +336,12 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
     @PauseLockWhileBusy
     def OnChangeMasterPass(self,evt):
         dlg=changeMasterPassDiag.ChangeMasterPassDiag(self)
-        if dlg.ShowModal()==wx.ID_OK:
-            self.reload()
+        dlg.ShowModal()
+        dlg.Destroy()
+        self.reload()
+
+##        if dlg.ShowModal()==wx.ID_OK:
+##            self.reload()
 
     @PauseLockWhileBusy
     def OnListAllPass(self,evt):
@@ -441,6 +448,9 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
             wx.MessageBox(_("Database imported successfully"),_("Done"),wx.OK,self)
 
 
+    def OnHelp(self,evt):
+        url="file://"+common.cur_file_dir()+'/help.htm'
+        webbrowser.open_new_tab(url)
 
 class MyTaskbarIcon(wx.TaskBarIcon):
     def __init__(self,frame):
@@ -939,7 +949,8 @@ def Login():
 
 if __name__ == "__main__":
     multiprocessing.freeze_support()
-    app=MyApp(False,"log.txt")
+    logfname=os.path.join(common.getRootConfDir(),"manpass.log")
+    app=MyApp(True,logfname)
     LI=Login()
     if LI!=None:
         Dpool=MyWorkerPool(apiclient.decryptRecordWithSingleSalt)
