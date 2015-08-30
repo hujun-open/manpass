@@ -949,7 +949,7 @@ def Login():
 
 if __name__ == "__main__":
     multiprocessing.freeze_support()
-    logfname=os.path.join(common.getRootConfDir(),"manpass.log")
+    logfname=os.path.join(common.getRootConfDir(),"manpassc.log")
     app=MyApp(True,logfname)
     LI=Login()
     if LI!=None:

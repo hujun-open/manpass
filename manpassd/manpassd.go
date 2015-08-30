@@ -13,8 +13,17 @@ import (
 	"manpassd/pki"
 	"manpassd/transport/tlsvr"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 )
+
+func processSignal(sigs chan os.Signal, done chan bool, pdb *passsql.PassDB) {
+	<-sigs
+	log.Println("Exiting")
+	pdb.PDB.Close()
+	done <- true
+}
 
 func main() {
 	version_str := "Manpass ver1.0 - server daemon"
@@ -104,6 +113,10 @@ func main() {
 	//	httpsvr, err := api.NewProvisionSVR(*svr_ip, *svr_port+1, *uname, upass)
 	//	httpsvr.Serve()
 	log.Println("Server started.")
-	var c chan int
-	<-c
+	sigs := make(chan os.Signal, 1)
+	done := make(chan bool, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	processSignal(sigs, done, passdb)
+	<-done
+
 }

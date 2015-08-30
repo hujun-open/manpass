@@ -4,9 +4,9 @@ block_cipher = None
 
 
 a = Analysis(['manpassc.py'],
-             pathex=['/media/sf_manpass/src/manpassc'],
-             hiddenimports=[],
-             hookspath=None,
+             pathex=['D:\\hujun\\manpass\\src\\manpassc'],
+             hiddenimports=['nacl', 'cffi'],
+             hookspath=['C:\\Python27\\Lib\\site-packages\\PyInstaller\\hooks\\'],
              runtime_hooks=None,
              excludes=None,
              cipher=block_cipher)
@@ -15,15 +15,15 @@ pyz = PYZ(a.pure,
 exe = EXE(pyz,
           a.scripts,
           exclude_binaries=True,
-          name='manpassc',
+          name='manpassc.exe',
           debug=False,
           strip=None,
-          upx=True,
-          console=True )
+          upx=False,
+          console=False , icon='manpassc.ico')
 coll = COLLECT(exe,
                a.binaries,
                a.zipfiles,
                a.datas,
                strip=None,
-               upx=True,
+               upx=False,
                name='manpassc')
