@@ -41,7 +41,7 @@ class AddPassDiag(wx.Dialog):
         self.label_upass = wx.StaticText(self, wx.ID_ANY,label=_("Password:"),style=wx.ALIGN_RIGHT)
         self.genpassb=wx.Button(self,wx.ID_ANY,_("Generate"))
         self.genpassdiag=genPassDiag.GenPassDiag(self)
-        self.text_ctrl_remark = wx.TextCtrl(self, wx.ID_ANY, remark,size=(300,-1),style=wx.TE_MULTILINE)
+        self.text_ctrl_remark = wx.TextCtrl(self, wx.ID_ANY, remark,size=(300,100),style=wx.TE_MULTILINE)
         self.label_remark = wx.StaticText(self, wx.ID_ANY,label=_("Remark:"),style=wx.ALIGN_LEFT)
         self.text_ctrl_meta.Bind(wx.EVT_CHAR,self.OnChar)
 
