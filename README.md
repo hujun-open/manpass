@@ -9,6 +9,10 @@ Manpass is an opensource, secure password manager, it has following features:
 *	Password history save the past passwords
 *	Passwords are stored in encrypted form within database, so that the database could reside in cloud storage (e.g. Dropbox) for redundancy and multi-clients synchronization.
 *	Support multiple Users
+
+# Download
+Binary build are provided for Windows/Linux/OSX, download from [here](https://github.com/hujun-open/manpass/releases)
+
 # Usage
 Run manpassc, manpassc will start manpassd automatically; for details usage, see help.htm or "Help" in popup menu
 
