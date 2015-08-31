@@ -7,3 +7,7 @@ cp manpassd ./dist/manpassc/
 cp py.dat ./dist/manpassc/
 cp help.htm ./dist/manpassc/
 cp -r help_files ./dist/manpassc/
+cp ../README.md ./dist/manpassc/
+cd ./dist/manpassc/
+sed -i 's/\r//' README.md
+cd ../../

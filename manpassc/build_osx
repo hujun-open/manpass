@@ -2,3 +2,5 @@ rm -rf build
 rm -rf dist
 go build ../manpassd/manpassd.go
 python setup.py py2app
+cp help.htm ./dist/manpassc.app/Contents/Resources/
+cp -r help_files ./dist/manpassc.app/Contents/Resources/help_files

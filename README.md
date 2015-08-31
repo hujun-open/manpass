@@ -10,7 +10,7 @@ Manpass is an opensource, secure password manager, it has following features:
 *	Passwords are stored in encrypted form within database, so that the database could reside in cloud storage (e.g. Dropbox) for redundancy and multi-clients synchronization.
 *	Support multiple Users
 # Usage
-see help.htm or "Help" in popup menu
+Run manpassc, manpassc will start manpassd automatically; for details usage, see help.htm or "Help" in popup menu
 
 # To Build/Run Source Code
 manpassc is written in python, manpassd is written in Go.
