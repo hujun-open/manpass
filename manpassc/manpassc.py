@@ -183,15 +183,15 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
 
     def copyInfoToClip(self,i,dkey="Pass"):
         dlg=None
+        itemname=""
+        if dkey=="Pass": itemname=_("Password")
+        if dkey=="Uname": itemname=_("Username")
         if i < len(self.passlist) and not wx.TheClipboard.IsOpened():
             cdata=wx.TextDataObject()
             cdata.SetText(self.passlist[i][dkey])
             wx.TheClipboard.Open()
             wx.TheClipboard.SetData(cdata)
             wx.TheClipboard.Close()
-            itemname=""
-            if dkey=="Pass": itemname=_("Password")
-            if dkey=="Uname": itemname=_("Username")
 ##            dlg = wx.MessageDialog(self, itemname+_(' Copied to Clipboard'),
 ##                           _('Done'),
 ##                           wx.OK | wx.ICON_INFORMATION)
@@ -488,6 +488,7 @@ class MainPannel(wx.Frame):
         self.upass=upass
         self.icon=wx.Icon(os.path.join(common.cur_file_dir(),"manpassc.ico"),wx.BITMAP_TYPE_ICO)
         self.SetIcon(self.icon)
+        #self.chkupdate_thread=checkUpdate.ChkUpdateThread("http://192.168.1.1:8090/ver.txt",self.version,self)
 
         #username, password must be encoded into utf-8 string before they could be used by crypto functions
         self.lock_label=wx.HyperlinkCtrl(self,wx.ID_ANY,_("Unlock Me"),style=wx.HL_ALIGN_CENTRE)
@@ -649,6 +650,7 @@ class MainPannel(wx.Frame):
         self.Bind(common.EVT_MANPASS_PROGRESS,self.UpdateProgress)
         self.Bind(common.EVT_MANPASS_LOAD_DONE,self.LoadDone)
         self.Bind(wx.EVT_SET_FOCUS,self.OnFocus)
+        #self.Bind(checkUpdate.EVT_CHK_UPDATE,self.CheckUpdateDone)
 
         if platform.system()=="Windows":
             import win32con
@@ -662,7 +664,7 @@ class MainPannel(wx.Frame):
             self.Show(True)
             self.Raise()
 
-
+        #self.chkupdate_thread.start()
         # end wxGlade
 
     def __set_properties(self):

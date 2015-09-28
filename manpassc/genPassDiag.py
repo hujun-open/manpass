@@ -65,12 +65,16 @@ class GenPassDiag(wx.Dialog):
         # end wxGlade
 
     def OnOK(self,evt):
+        c=self.grid.GetPropertyValue("custom")
+        c=c.strip()
+        c=c.replace(" ","")
+        c=c.replace("\t","")
         self.passwd=common.genPass(self.grid.GetPropertyValue("plen"),
                                    self.grid.GetPropertyValue("digit"),
                                    self.grid.GetPropertyValue("lowercase"),
                                    self.grid.GetPropertyValue("uppercase"),
                                    self.grid.GetPropertyValue("punction"),
-                                   self.grid.GetPropertyValue("custom"),
+                                   c,
             )
         evt.Skip()
 
@@ -88,4 +92,5 @@ if __name__ == "__main__":
     diag=GenPassDiag(None)
     app.SetTopWindow(diag)
     diag.ShowModal()
+    print diag.passwd
     app.MainLoop()
