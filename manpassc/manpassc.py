@@ -108,6 +108,9 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
         #self.AppendTextColumn(_("Password"),mode=wx.dataview.DATAVIEW_CELL_ACTIVATABLE)
         self.AppendTextColumn(_("Creation time"))
         self.AppendTextColumn(_("Rev"))
+        self.sort_direction_list=[]
+        for i in range(4):
+            self.sort_direction_list.append(True) #True means ascending
         self.fctrl=filter_txtctrl
         self.filterme=True
 
@@ -115,6 +118,7 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
         self.apc=self.GetParent().apiclient
         self.Bind(wx.dataview.EVT_DATAVIEW_ITEM_ACTIVATED,self.OnDClick,self)
         self.Bind(wx.dataview.EVT_DATAVIEW_ITEM_CONTEXT_MENU,self.OnPopMenu,self)
+        self.Bind(wx.dataview.EVT_DATAVIEW_COLUMN_HEADER_CLICK,self.OnClickHead,self)
 
         self.passlist=[]
         self.cnsort=cnsort()
@@ -143,11 +147,19 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
 ##        self.GetParent().unlock()
 ##        self.GetParent().setStatusTxt(_("Done."))
 
-    def reloadWithoutGet(self):
+    def reloadWithoutGet(self,sort_col=0):
         self.DeleteAllItems()
         if len(self.passlist)==0:
             return
-        self.passlist=sorted(self.passlist,key=lambda k: k['Meta'].lower())
+        sortkey="Meta"
+        if sort_col==1:sortkey="Uname"
+        if sort_col==2:sortkey="Pass_time"
+        if sort_col==3:sortkey="Pass_rev"
+        if isinstance(self.passlist[0][sortkey],int):
+            self.passlist=sorted(self.passlist,key=lambda k: k[sortkey],reverse=self.sort_direction_list[sort_col])
+        else:
+            self.passlist=sorted(self.passlist,key=lambda k: k[sortkey].lower(),reverse=self.sort_direction_list[sort_col])
+        self.sort_direction_list[sort_col]=not self.sort_direction_list[sort_col]
         filter_key=self.fctrl.GetValue().strip()
         i=0
         for p in self.passlist:
@@ -451,6 +463,13 @@ class PassListCtrl(wx.dataview.DataViewListCtrl):
     def OnHelp(self,evt):
         url="file://"+common.cur_file_dir()+'/help.htm'
         webbrowser.open_new_tab(url)
+
+
+    def OnClickHead(self,evt):
+        col=evt.GetColumn()
+        self.reloadWithoutGet(col)
+
+
 
 class MyTaskbarIcon(wx.TaskBarIcon):
     def __init__(self,frame):
